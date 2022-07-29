@@ -7,6 +7,7 @@ mod class;
 mod field_info;
 mod method_info;
 mod attribute_info;
+mod class_file;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();

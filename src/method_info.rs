@@ -27,19 +27,27 @@ impl Clone for MethodInfo {
 
 #[derive(Debug, Clone)]
 pub struct Method {
+    pub name: String,
     pub access_flags: u16,
     pub descriptor: String,
     pub attributes: HashMap<String, Vec<u8>>
 }
 
 impl Method {
-    pub fn from_info(cp: &Vec<ConstantPoolInfo>, m: &MethodInfo) -> Method {
-        let ret = Method {
-            access_flags: m.access_flags,
+    pub fn from_info(cp: &Vec<ConstantPoolInfo>, mi: &MethodInfo) -> Method {
+        let mut m = Method {
+            name: cp[(mi.name_index - 1) as usize].utf8().expect("bad utf8 for method name"),
+            access_flags: mi.access_flags,
             attributes: HashMap::new(),
-            descriptor: cp[(m.descriptor_index - 1) as usize]
-                .utf8().expect("bad utf8 for referenced descriptor")
+            descriptor: cp[(mi.descriptor_index - 1) as usize]
+                .utf8().expect("bad utf8 for method descriptor")
         };
-        ret
+        for ai in &mi.attributes {
+            m.attributes.insert(
+                cp[(ai.name_index - 1) as usize].utf8().expect(""),
+                ai.info.clone()
+            );
+        };
+        m
     }
 }

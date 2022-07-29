@@ -63,9 +63,7 @@ pub mod representations {
     impl Clone for Utf8 {
         fn clone(&self) -> Self {
             let mut bytes = Vec::with_capacity(self.bytes.len());
-            for i in &self.bytes {
-                bytes.push(*i)
-            }
+            self.bytes.clone_into(&mut bytes);
             Utf8 { length: self.length, bytes }
         }
     }

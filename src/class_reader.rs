@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::Read;
 use crate::attribute_info::AttributeInfo;
-use crate::class::ClassFile;
+use crate::class_file::ClassFile;
 use crate::constant_pool::ConstantPoolInfo;
 use crate::constant_pool::representations::*;
 use crate::field_info::FieldInfo;

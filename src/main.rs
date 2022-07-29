@@ -1,4 +1,5 @@
-extern crate core;
+use crate::class::Class;
+use crate::class_reader::ClassReader;
 
 mod constant_pool;
 mod class_reader;
@@ -8,5 +9,9 @@ mod method_info;
 mod attribute_info;
 
 fn main() {
-    println!("Hello, world!");
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() < 2 {
+        panic!("argument needed")
+    }
+    dbg!(Class::new(&ClassReader::new(args[1].clone()).read_class()));
 }

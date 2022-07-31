@@ -11,7 +11,7 @@ pub struct FieldInfo {
     pub attributes: Vec<AttributeInfo>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Field {
     pub access_flags: u16,
     pub name: String,

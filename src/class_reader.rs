@@ -12,11 +12,11 @@ pub struct ClassReader {
 }
 
 impl ClassReader {
-    pub(crate) fn new(path: String) -> ClassReader {
-        let f: File = File::open(path).expect("open fail");
-        ClassReader {
+    pub(crate) fn new(path: &String) -> Result<ClassReader, std::io::Error> {
+        let f: File = File::open(path)?;
+        Ok(ClassReader {
             bytes: f.bytes(),
-        }
+        })
     }
 
     fn read_n<'a>(&mut self, n: usize) -> Vec<u8> {
@@ -149,7 +149,7 @@ impl ClassReader {
         a
     }
 
-    pub(crate) fn read_class(&mut self) -> ClassFile {
+    pub(crate) fn read_classfile(&mut self) -> ClassFile {
         let mut cf = ClassFile {
             magic: self.read_u4(),
             minor_version: self.read_u2(),

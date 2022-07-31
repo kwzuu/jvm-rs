@@ -1,12 +1,12 @@
 use std::collections::HashMap;
-use std::hash::Hash;
-use crate::attribute_info::AttributeInfo;
+use std::rc::Rc;
 use crate::class_file::ClassFile;
+use crate::ClassReader;
 use crate::constant_pool::ConstantPoolInfo;
-use crate::field_info::{Field, FieldInfo};
-use crate::method_info::{Method, MethodInfo};
+use crate::field_info::Field;
+use crate::method::Method;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Class {
     pub version: (u16, u16), // (major, minor)
     pub constant_pool: Vec<ConstantPoolInfo>,
@@ -14,16 +14,21 @@ pub struct Class {
     pub this_class: String,
     pub super_class: String,
     pub interfaces: Vec<String>, // sorted
-    pub fields: HashMap<String, Field>,
-    pub methods: HashMap<String, Method>,
+    pub fields: HashMap<String, Rc<Field>>,
+    pub methods: HashMap<(String, String), Rc<Method>>, // (Name, Descriptor)
     pub attributes: HashMap<String, Vec<u8>>, // String is name, Vec is data
 }
 
-impl Class {
-    pub(crate) fn new(c: &ClassFile) -> Class {
+impl<'a> Class {
+    pub fn from_filename(name: &String) -> Result<Class, std::io::Error> {
+        return Ok(Self::from_classfile(ClassReader::new(name)?.read_classfile()));
+    }
+
+    pub(crate) fn from_classfile(c: ClassFile) -> Class {
         let mut new_cp = vec![];
         c.constant_pool.clone_into(&mut new_cp);
-        let mut new_cp = &mut new_cp;
+        let new_cp = &mut new_cp;
+
         let mut cls = Class {
             version: (c.major_version, c.minor_version),
             constant_pool: new_cp.clone(),
@@ -39,14 +44,11 @@ impl Class {
         };
         for fi in &c.fields {
             let f = Field::from_info(new_cp, fi);
-            cls.fields.insert(f.name.clone(), f);
+            cls.fields.insert(f.name.clone(), Rc::new(f));
         }
         for mi in &c.methods {
             let m = Method::from_info(new_cp, mi);
-            cls.methods.insert(
-                m.name.clone(),
-                m
-            );
+            cls.methods.insert((m.name.clone(), m.descriptor.clone()),Rc::new(m));
         }
         for a in &c.attributes {
             cls.attributes.insert(
@@ -56,5 +58,19 @@ impl Class {
             );
         }
         cls
+    }
+
+    pub fn get_method(&self, name: &'a String, descriptor: &'a String) -> Result<Rc<Method>, ()> {
+        if let Some(m) = self.methods.get(&(name.clone(), descriptor.clone())) {
+            return Ok(m.clone())
+        }
+        return Err(())
+    }
+
+    pub fn get_field(&self, name: &'a String) -> Result<Rc<Field>, ()> {
+        match self.fields.get(name) {
+            Some(f) => Ok(f.clone()),
+            _ => Err(())
+        }
     }
 }

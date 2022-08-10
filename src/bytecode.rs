@@ -1,4 +1,4 @@
-use std::mem::transmute;
+use crate::bytecode::BytecodeParseError::{EarlyEnd, InvalidOpcode};
 use std::slice::Iter;
 
 #[repr(u8)]
@@ -172,7 +172,7 @@ pub enum Instruction {
     IfAcmpeq(u16),
     IfAcmpne(u16),
     Goto(u16),
-    Tableswitch, // TODO: implement
+    Tableswitch,  // TODO: implement
     Lookupswitch, // TODO: implement
     Ireturn,
     Lreturn,
@@ -211,26 +211,28 @@ pub enum Instruction {
 
 pub enum BytecodeParseError {
     EarlyEnd,
-    InvalidOpcode
+    InvalidOpcode(u8),
 }
 
 impl Instruction {
     pub fn read_from(i: &mut Iter<u8>) -> Result<Instruction, BytecodeParseError> {
-        fn next_u1(i: &mut Iter<u8>) -> u8 { *i.next().unwrap() }
-        fn next_i1(i: &mut Iter<u8>) -> i8 {
-            i8::from_be_bytes(next_u1(i).to_be_bytes())
+        fn next_u1(i: &mut Iter<u8>) -> Result<u8, BytecodeParseError> {
+            i.next().ok_or(EarlyEnd).map(|x| *x)
+        }
+        fn next_i1(i: &mut Iter<u8>) -> Result<i8, BytecodeParseError> {
+            Ok(i8::from_be_bytes(next_u1(i)?.to_be_bytes()))
         }
 
-        fn next_u2(i: &mut Iter<u8>) -> u16 {
-            let hi = next_u1(i) as u16;
-            let lo = next_u1(i) as u16;
-            hi << 8 | lo
+        fn next_u2(i: &mut Iter<u8>) -> Result<u16, BytecodeParseError> {
+            let hi = next_u1(i)? as u16;
+            let lo = next_u1(i)? as u16;
+            Ok(hi << 8 | lo)
         }
 
-        fn next_u4(i: &mut Iter<u8>) -> u32 {
-            let hi = next_u2(i) as u32;
-            let lo = next_u2(i) as u32;
-            hi << 16 | lo
+        fn next_u4(i: &mut Iter<u8>) -> Result<u32, BytecodeParseError> {
+            let hi = next_u2(i)? as u32;
+            let lo = next_u2(i)? as u32;
+            Ok(hi << 16 | lo)
         }
 
         if let Some(x) = i.next() {
@@ -251,16 +253,16 @@ impl Instruction {
                 0x0d => Self::Fconst2,
                 0x0e => Self::Dconst0,
                 0x0f => Self::Dconst1,
-                0x10 => Self::Bipush(next_u1(i)),
-                0x11 => Self::Sipush(next_u2(i)),
-                0x12 => Self::Ldc(next_u1(i)),
-                0x13 => Self::LdcW(next_u2(i)),
-                0x14 => Self::Ldc2W(next_u2(i)),
-                0x15 => Self::Iload(next_u1(i)),
-                0x16 => Self::Lload(next_u1(i)),
-                0x17 => Self::Fload(next_u1(i)),
-                0x18 => Self::Dload(next_u1(i)),
-                0x19 => Self::Aload(next_u1(i)),
+                0x10 => Self::Bipush(next_u1(i)?),
+                0x11 => Self::Sipush(next_u2(i)?),
+                0x12 => Self::Ldc(next_u1(i)?),
+                0x13 => Self::LdcW(next_u2(i)?),
+                0x14 => Self::Ldc2W(next_u2(i)?),
+                0x15 => Self::Iload(next_u1(i)?),
+                0x16 => Self::Lload(next_u1(i)?),
+                0x17 => Self::Fload(next_u1(i)?),
+                0x18 => Self::Dload(next_u1(i)?),
+                0x19 => Self::Aload(next_u1(i)?),
                 0x1a => Self::Iload0,
                 0x1b => Self::Iload1,
                 0x1c => Self::Iload2,
@@ -289,11 +291,11 @@ impl Instruction {
                 0x33 => Self::Baload,
                 0x34 => Self::Caload,
                 0x35 => Self::Saload,
-                0x36 => Self::Istore(next_u1(i)),
-                0x37 => Self::Lstore(next_u1(i)),
-                0x38 => Self::Fstore(next_u1(i)),
-                0x39 => Self::Dstore(next_u1(i)),
-                0x3a => Self::Astore(next_u1(i)),
+                0x36 => Self::Istore(next_u1(i)?),
+                0x37 => Self::Lstore(next_u1(i)?),
+                0x38 => Self::Fstore(next_u1(i)?),
+                0x39 => Self::Dstore(next_u1(i)?),
+                0x3a => Self::Astore(next_u1(i)?),
                 0x3b => Self::Istore0,
                 0x3c => Self::Istore1,
                 0x3d => Self::Istore2,
@@ -367,7 +369,7 @@ impl Instruction {
                 0x81 => Self::Lor,
                 0x82 => Self::Ixor,
                 0x83 => Self::Lxor,
-                0x84 => Self::Iinc(next_u1(i), next_i1(i)),
+                0x84 => Self::Iinc(next_u1(i)?, next_i1(i)?),
                 0x85 => Self::I2l,
                 0x86 => Self::I2f,
                 0x87 => Self::I2d,
@@ -388,21 +390,21 @@ impl Instruction {
                 0x96 => Self::Fcmpg,
                 0x97 => Self::Dcmpl,
                 0x98 => Self::Dcmpg,
-                0x99 => Self::Ifeq(next_u2(i)),
-                0x9a => Self::Ifne(next_u2(i)),
-                0x9b => Self::Iflt(next_u2(i)),
-                0x9c => Self::Ifge(next_u2(i)),
-                0x9d => Self::Ifgt(next_u2(i)),
-                0x9e => Self::Ifle(next_u2(i)),
-                0x9f => Self::IfIcmpeq(next_u2(i)),
-                0xa0 => Self::IfIcmpne(next_u2(i)),
-                0xa1 => Self::IfIcmplt(next_u2(i)),
-                0xa2 => Self::IfIcmpge(next_u2(i)),
-                0xa3 => Self::IfIcmpgt(next_u2(i)),
-                0xa4 => Self::IfIcmple(next_u2(i)),
-                0xa5 => Self::IfAcmpeq(next_u2(i)),
-                0xa6 => Self::IfAcmpne(next_u2(i)),
-                0xa7 => Self::Goto(next_u2(i)),
+                0x99 => Self::Ifeq(next_u2(i)?),
+                0x9a => Self::Ifne(next_u2(i)?),
+                0x9b => Self::Iflt(next_u2(i)?),
+                0x9c => Self::Ifge(next_u2(i)?),
+                0x9d => Self::Ifgt(next_u2(i)?),
+                0x9e => Self::Ifle(next_u2(i)?),
+                0x9f => Self::IfIcmpeq(next_u2(i)?),
+                0xa0 => Self::IfIcmpne(next_u2(i)?),
+                0xa1 => Self::IfIcmplt(next_u2(i)?),
+                0xa2 => Self::IfIcmpge(next_u2(i)?),
+                0xa3 => Self::IfIcmpgt(next_u2(i)?),
+                0xa4 => Self::IfIcmple(next_u2(i)?),
+                0xa5 => Self::IfAcmpeq(next_u2(i)?),
+                0xa6 => Self::IfAcmpne(next_u2(i)?),
+                0xa7 => Self::Goto(next_u2(i)?),
                 0xaa => Self::Tableswitch,
                 0xab => Self::Lookupswitch,
                 0xac => Self::Ireturn,
@@ -411,35 +413,35 @@ impl Instruction {
                 0xaf => Self::Dreturn,
                 0xb0 => Self::Areturn,
                 0xb1 => Self::Return,
-                0xb2 => Self::Getstatic(next_u2(i)),
-                0xb3 => Self::Putstatic(next_u2(i)),
-                0xb4 => Self::Getfield(next_u2(i)),
-                0xb5 => Self::Putfield(next_u2(i)),
-                0xb6 => Self::Invokevirtual(next_u2(i)),
-                0xb7 => Self::Invokespecial(next_u2(i)),
-                0xb8 => Self::Invokestatic(next_u2(i)),
-                0xb9 => Self::Invokeinterface(next_u2(i)),
-                0xba => Self::Invokedynamic(next_u2(i)),
-                0xbb => Self::New(next_u2(i)),
-                0xbc => Self::Newarray(next_u1(i)),
-                0xbd => Self::Anewarray(next_u2(i)),
+                0xb2 => Self::Getstatic(next_u2(i)?),
+                0xb3 => Self::Putstatic(next_u2(i)?),
+                0xb4 => Self::Getfield(next_u2(i)?),
+                0xb5 => Self::Putfield(next_u2(i)?),
+                0xb6 => Self::Invokevirtual(next_u2(i)?),
+                0xb7 => Self::Invokespecial(next_u2(i)?),
+                0xb8 => Self::Invokestatic(next_u2(i)?),
+                0xb9 => Self::Invokeinterface(next_u2(i)?),
+                0xba => Self::Invokedynamic(next_u2(i)?),
+                0xbb => Self::New(next_u2(i)?),
+                0xbc => Self::Newarray(next_u1(i)?),
+                0xbd => Self::Anewarray(next_u2(i)?),
                 0xbe => Self::Arraylength,
                 0xbf => Self::Athrow,
-                0xc0 => Self::Checkcast(next_u2(i)),
-                0xc1 => Self::Instanceof(next_u2(i)),
+                0xc0 => Self::Checkcast(next_u2(i)?),
+                0xc1 => Self::Instanceof(next_u2(i)?),
                 0xc2 => Self::Monitorenter,
                 0xc3 => Self::Monitorexit,
-                0xc4 => Self::Wide3(next_u1(i), next_u2(i)),
-                0xc5 => Self::Multianewarray(next_u2(i), next_u1(i)),
-                0xc6 => Self::Ifnull(next_u2(i)),
-                0xc7 => Self::Ifnonnull(next_u2(i)),
-                0xc8 => Self::GotoW(next_u4(i)),
+                0xc4 => Self::Wide3(next_u1(i)?, next_u2(i)?),
+                0xc5 => Self::Multianewarray(next_u2(i)?, next_u1(i)?),
+                0xc6 => Self::Ifnull(next_u2(i)?),
+                0xc7 => Self::Ifnonnull(next_u2(i)?),
+                0xc8 => Self::GotoW(next_u4(i)?),
                 0xca => Self::Breakpoint,
                 0xfe => Self::Impdep1,
                 0xff => Self::Impdep2,
-                x => return Err(BytecodeParseError::InvalidOpcode)
-            })
+                x => return Err(InvalidOpcode(x)),
+            });
         }
-        Err(BytecodeParseError::EarlyEnd)
+        Err(EarlyEnd)
     }
 }

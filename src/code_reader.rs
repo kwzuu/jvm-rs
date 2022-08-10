@@ -1,23 +1,23 @@
-use std::slice::Iter;
 use crate::attribute_info::AttributeInfo;
 use crate::bytecode::{BytecodeParseError, Instruction};
 use crate::code::{Code, ExceptionTableItem};
 use crate::code_reader::CodeParseError::{EarlyEnd, InvalidFormat};
+use std::slice::Iter;
 
 pub struct CodeReader<'a> {
-    bytes: Iter<'a, u8>
+    bytes: Iter<'a, u8>,
 }
 
 #[derive(Debug, Clone)]
 pub enum CodeParseError<'a> {
     EarlyEnd(&'a str),
-    InvalidFormat
+    InvalidFormat,
 }
 
 impl<'a> CodeReader<'a> {
     pub fn new(bytes: &'a Vec<u8>) -> CodeReader<'a> {
         CodeReader {
-            bytes: bytes.iter()
+            bytes: bytes.iter(),
         }
     }
 
@@ -39,16 +39,15 @@ impl<'a> CodeReader<'a> {
 
     fn read_attribute(&mut self) -> Result<AttributeInfo, CodeParseError<'a>> {
         let mut ai = AttributeInfo {
-            name_index: self.read_u2()
-                .ok_or(EarlyEnd("attr name index"))?,
+            name_index: self.read_u2().ok_or(EarlyEnd("attr name index"))?,
             attribute_length: self.read_u4().ok_or(EarlyEnd("attr len"))?,
-            info: vec![]
+            info: vec![],
         };
         ai.info.reserve(ai.attribute_length as usize);
         for _ in 0..ai.attribute_length {
             match self.bytes.next() {
                 Some(x) => ai.info.push(*x),
-                None => return Err(EarlyEnd("attr"))
+                None => return Err(EarlyEnd("attr")),
             }
         }
         Ok(ai)
@@ -62,8 +61,6 @@ impl<'a> CodeReader<'a> {
             handler_pc: self.read_u2()?,
         })
     }
-
-
 
     pub fn read_code(&mut self) -> Result<Code, CodeParseError<'a>> {
         let mut code = Code {
@@ -86,17 +83,19 @@ impl<'a> CodeReader<'a> {
             code.code.push(match Instruction::read_from(&mut bytecode) {
                 Ok(x) => x,
                 Err(BytecodeParseError::EarlyEnd) => break,
-                Err(BytecodeParseError::InvalidOpcode) => {
-                    return Err(InvalidFormat)
-                }
+                Err(BytecodeParseError::InvalidOpcode(_)) => return Err(InvalidFormat),
             });
         }
+
         let exception_table_length = self.read_u2().unwrap();
-        code.exception_table.reserve(exception_table_length as usize);
+        code.exception_table
+            .reserve(exception_table_length as usize);
 
         for _ in 0..exception_table_length {
-            code.exception_table.push(self.read_exception_table_item()
-                .ok_or(EarlyEnd("exception table"))?);
+            code.exception_table.push(
+                self.read_exception_table_item()
+                    .ok_or(EarlyEnd("exception table"))?,
+            );
         }
 
         let attributes_count = self.read_u2().unwrap();

@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use crate::attribute_info::AttributeInfo;
 use crate::constant_pool::ConstantPoolInfo;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct FieldInfo {
@@ -16,7 +16,7 @@ pub struct Field {
     pub access_flags: u16,
     pub name: String,
     pub descriptor: String,
-    pub attributes: HashMap<String, Vec<u8>>
+    pub attributes: HashMap<String, Vec<u8>>,
 }
 
 impl Field {
@@ -24,16 +24,19 @@ impl Field {
         let mut f = Field {
             access_flags: fi.access_flags,
             name: cp[(fi.name_index - 1) as usize]
-                .utf8().expect("bad utf8 in field name"),
+                .utf8()
+                .expect("bad utf8 in field name"),
             descriptor: cp[(fi.descriptor_index - 1) as usize]
-                .utf8().expect("bad utf8 in field descriptor"),
-            attributes: HashMap::new()
+                .utf8()
+                .expect("bad utf8 in field descriptor"),
+            attributes: HashMap::new(),
         };
         for a in &fi.attributes {
             f.attributes.insert(
-                cp[(a.name_index   -1) as usize]
-                    .utf8().expect("bad utf8 in attribute name"),
-                a.info.clone()
+                cp[(a.name_index - 1) as usize]
+                    .utf8()
+                    .expect("bad utf8 in attribute name"),
+                a.info.clone(),
             );
         }
         f

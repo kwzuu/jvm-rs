@@ -1,22 +1,22 @@
-use std::rc::Rc;
 use crate::class::Class;
 use crate::class_reader::ClassReader;
 use crate::runtime::Runtime;
+use std::rc::Rc;
 
-mod constant_pool;
-mod class_reader;
-mod class;
-mod field_info;
-mod method_info;
 mod attribute_info;
-mod class_file;
-mod runtime;
 mod bytecode;
-mod method;
+mod class;
+mod class_file;
+mod class_reader;
 mod code;
 mod code_reader;
-mod things;
+mod constant_pool;
+mod field_info;
+mod method;
+mod method_info;
+mod runtime;
 mod stack_frame;
+mod things;
 
 fn main() -> Result<(), std::io::Error> {
     let args: Vec<String> = std::env::args().collect();

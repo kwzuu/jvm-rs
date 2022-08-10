@@ -1,4 +1,3 @@
-
 use crate::attribute_info::AttributeInfo;
 use crate::bytecode::Instruction;
 
@@ -8,7 +7,7 @@ pub struct Code {
     pub max_locals: u16,
     pub code: Vec<Instruction>,
     pub exception_table: Vec<ExceptionTableItem>,
-    pub attributes: Vec<AttributeInfo> // name:data
+    pub attributes: Vec<AttributeInfo>, // name:data
 }
 
 #[derive(Debug, Clone)]

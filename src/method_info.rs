@@ -1,7 +1,4 @@
-use std::collections::HashMap;
 use crate::attribute_info::AttributeInfo;
-use crate::constant_pool::ConstantPoolInfo;
-use crate::Runtime;
 
 #[derive(Debug)]
 pub struct MethodInfo {
@@ -9,7 +6,7 @@ pub struct MethodInfo {
     pub(crate) name_index: u16,
     pub(crate) descriptor_index: u16,
     pub(crate) attributes_count: u16,
-    pub(crate) attributes: Vec<AttributeInfo>
+    pub(crate) attributes: Vec<AttributeInfo>,
 }
 
 impl Clone for MethodInfo {

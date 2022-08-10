@@ -2,7 +2,7 @@
 pub struct AttributeInfo {
     pub name_index: u16,
     pub attribute_length: u32,
-    pub info: Vec<u8>
+    pub info: Vec<u8>,
 }
 
 impl Clone for AttributeInfo {
@@ -14,7 +14,7 @@ impl Clone for AttributeInfo {
         AttributeInfo {
             name_index: self.name_index,
             attribute_length: self.attribute_length,
-            info
+            info,
         }
     }
 }

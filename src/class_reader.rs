@@ -1,11 +1,11 @@
-use std::fs::File;
-use std::io::Read;
 use crate::attribute_info::AttributeInfo;
 use crate::class_file::ClassFile;
-use crate::constant_pool::ConstantPoolInfo;
 use crate::constant_pool::representations::*;
+use crate::constant_pool::ConstantPoolInfo;
 use crate::field_info::FieldInfo;
 use crate::method_info::MethodInfo;
+use std::fs::File;
+use std::io::Read;
 
 pub struct ClassReader {
     bytes: std::io::Bytes<File>,
@@ -14,9 +14,7 @@ pub struct ClassReader {
 impl ClassReader {
     pub(crate) fn new(path: &String) -> Result<ClassReader, std::io::Error> {
         let f: File = File::open(path)?;
-        Ok(ClassReader {
-            bytes: f.bytes(),
-        })
+        Ok(ClassReader { bytes: f.bytes() })
     }
 
     fn read_n<'a>(&mut self, n: usize) -> Vec<u8> {
@@ -46,60 +44,60 @@ impl ClassReader {
     fn read_cpinfo(&mut self) -> ConstantPoolInfo {
         match self.read_u1() {
             7 => ConstantPoolInfo::Class(Class {
-                name_index: self.read_u2()
+                name_index: self.read_u2(),
             }),
             9 => ConstantPoolInfo::Fieldref(Fieldref {
                 class_index: self.read_u2(),
-                name_and_type_index: self.read_u2()
+                name_and_type_index: self.read_u2(),
             }),
             10 => ConstantPoolInfo::Methodref(Methodref {
                 class_index: self.read_u2(),
-                name_and_type_index: self.read_u2()
+                name_and_type_index: self.read_u2(),
             }),
             11 => ConstantPoolInfo::InterfaceMethodref(InterfaceMethodref {
                 class_index: self.read_u2(),
-                name_and_type_index: self.read_u2()
+                name_and_type_index: self.read_u2(),
             }),
             8 => ConstantPoolInfo::JString(JString {
-                string_index: self.read_u2()
+                string_index: self.read_u2(),
             }),
             3 => ConstantPoolInfo::Integer(Integer {
-                bytes: self.read_u4()
+                bytes: self.read_u4(),
             }),
             4 => ConstantPoolInfo::Float(Float {
-                bytes: self.read_u4()
+                bytes: self.read_u4(),
             }),
             5 => ConstantPoolInfo::Long(Long {
                 high_bytes: self.read_u4(),
-                low_bytes: self.read_u4()
+                low_bytes: self.read_u4(),
             }),
             6 => ConstantPoolInfo::Double(Double {
                 high_bytes: self.read_u4(),
-                low_bytes: self.read_u4()
+                low_bytes: self.read_u4(),
             }),
-            12 => ConstantPoolInfo::NameAndType( NameAndType {
+            12 => ConstantPoolInfo::NameAndType(NameAndType {
                 name_index: self.read_u2(),
-                descriptor_index: self.read_u2()
+                descriptor_index: self.read_u2(),
             }),
             1 => {
                 let l = self.read_u2();
                 ConstantPoolInfo::Utf8(Utf8 {
                     length: l,
-                    bytes: self.read_n(l as usize)
+                    bytes: self.read_n(l as usize),
                 })
-            },
+            }
             15 => ConstantPoolInfo::MethodHandle(MethodHandle {
                 reference_kind: self.read_u1(),
-                reference_index: self.read_u2()
+                reference_index: self.read_u2(),
             }),
             16 => ConstantPoolInfo::MethodType(MethodType {
-                descriptor_index: self.read_u2()
+                descriptor_index: self.read_u2(),
             }),
             18 => ConstantPoolInfo::InvokeDynamic(InvokeDynamic {
                 bootstrap_method_attr_index: self.read_u2(),
-                name_and_type_index: self.read_u2()
+                name_and_type_index: self.read_u2(),
             }),
-            x => panic!("invalid constant pool tag {}", x)
+            x => panic!("invalid constant pool tag {}", x),
         }
     }
 
@@ -109,7 +107,7 @@ impl ClassReader {
             name_index: self.read_u2(),
             descriptor_index: self.read_u2(),
             attributes_count: self.read_u2(),
-            attributes: vec![]
+            attributes: vec![],
         };
 
         for _ in 0..f.attributes_count {
@@ -125,7 +123,7 @@ impl ClassReader {
             name_index: self.read_u2(),
             descriptor_index: self.read_u2(),
             attributes_count: self.read_u2(),
-            attributes: vec![]
+            attributes: vec![],
         };
 
         for _ in 0..m.attributes_count {
@@ -166,7 +164,7 @@ impl ClassReader {
             methods_count: 0,
             methods: vec![],
             attributes_count: 0,
-            attributes: vec![]
+            attributes: vec![],
         };
 
         for _ in 0..(cf.constant_pool_count - 1) {

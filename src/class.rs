@@ -22,7 +22,7 @@ pub struct Class {
 impl<'a> Class {
     pub fn from_filename(name: &String) -> Result<Class, std::io::Error> {
         return Ok(Self::from_classfile(
-            ClassReader::new(name)?.read_classfile(),
+            ClassReader::new(&name)?.read_classfile(),
         ));
     }
 

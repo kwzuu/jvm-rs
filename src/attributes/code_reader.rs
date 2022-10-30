@@ -72,7 +72,7 @@ impl<'a> CodeReader<'a> {
         };
 
         let code_length = self.read_u4().ok_or(EarlyEnd("code len"))?;
-        dbg!(code_length);
+        // dbg!(code_length);
         let mut bytecode: Vec<u8> = Vec::with_capacity(code_length as usize);
 
         for _ in 0..code_length {
@@ -88,14 +88,14 @@ impl<'a> CodeReader<'a> {
             });
         }
 
-        dbg!(&code.code);
+        // dbg!(&code.code);
 
         let exception_table_length = self.read_u2().unwrap();
-        dbg!(exception_table_length);
+        // dbg!(exception_table_length);
 
         code.exception_table.reserve(exception_table_length as usize);
 
-        dbg!(exception_table_length);
+        // dbg!(exception_table_length);
         for _ in 0..exception_table_length {
             code.exception_table.push(
                 self.read_exception_table_item()

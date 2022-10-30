@@ -139,6 +139,30 @@ impl ConstantPoolInfo {
         }
     }
 
+    pub fn method_handle(&self) -> Option<MethodHandle> {
+        if let ConstantPoolInfo::MethodHandle(mh) = self {
+            Some(mh.clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn methodref(&self) -> Option<Methodref> {
+        if let ConstantPoolInfo::Methodref(mr) = self {
+            Some(mr.clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn name_and_type(&self) -> Option<NameAndType> {
+        if let ConstantPoolInfo::NameAndType(nt) = self {
+            Some(nt.clone())
+        } else {
+            None
+        }
+    }
+
     pub fn tag(self) -> u8 {
         use ConstantPoolInfo::*;
 

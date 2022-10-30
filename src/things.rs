@@ -1,11 +1,13 @@
 use crate::Class;
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub struct Object {
     class: Rc<Class>,
     fields: Rc<[Thing]>,
 }
 
+#[derive(Clone, Debug)]
 pub enum Thing {
     Byte(i8),
     Char(char),

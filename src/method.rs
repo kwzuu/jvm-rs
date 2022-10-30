@@ -1,5 +1,5 @@
-use crate::code::Code;
-use crate::code_reader::CodeReader;
+use crate::attributes::code::Code;
+use crate::attributes::code_reader::CodeReader;
 use crate::constant_pool::ConstantPoolInfo;
 use crate::method_info::MethodInfo;
 use crate::stack_frame::StackFrame;
@@ -7,6 +7,7 @@ use crate::things::Thing;
 use crate::{Class, Runtime};
 use std::collections::HashMap;
 use std::rc::Rc;
+use crate::bytecode::Instruction;
 
 #[derive(Debug, Clone)]
 pub struct Method {
@@ -48,7 +49,21 @@ impl Method {
         class: Rc<Class>,
         stack_frame: StackFrame,
     ) -> Option<Thing> {
+        let mut stack = vec![];
+
+        println!("{}.{} called", class.this_class, self.name);
         let mut pc: usize = 0;
-        None
+        let code = &self.code.clone().expect("called method with no code!");
+        loop {
+            match code.code[pc] {
+                Instruction::Iconst2 => stack.push(Thing::Int(2)),
+                Instruction::Ireturn => return stack.pop(),
+                _ => {}
+            }
+            pc += 1;
+            if pc > code.code.len() {
+                panic!("code overrun!")
+            }
+        }
     }
 }

@@ -1,7 +1,7 @@
-use crate::attribute_info::AttributeInfo;
+use crate::attributes::attribute_info::AttributeInfo;
 use crate::bytecode::{BytecodeParseError, Instruction};
-use crate::code::{Code, ExceptionTableItem};
-use crate::code_reader::CodeParseError::{EarlyEnd, InvalidFormat};
+use crate::attributes::code::{Code, ExceptionTableItem};
+use crate::attributes::code_reader::CodeParseError::{EarlyEnd, InvalidFormat};
 use std::slice::Iter;
 
 pub struct CodeReader<'a> {
@@ -32,8 +32,8 @@ impl<'a> CodeReader<'a> {
     }
 
     fn read_u4(&mut self) -> Option<u32> {
-        let hi = self.read_u1()? as u32;
-        let lo = self.read_u1()? as u32;
+        let hi = self.read_u2()? as u32;
+        let lo = self.read_u2()? as u32;
         Some(hi << 16 | lo)
     }
 
@@ -72,8 +72,9 @@ impl<'a> CodeReader<'a> {
         };
 
         let code_length = self.read_u4().ok_or(EarlyEnd("code len"))?;
-
+        dbg!(code_length);
         let mut bytecode: Vec<u8> = Vec::with_capacity(code_length as usize);
+
         for _ in 0..code_length {
             bytecode.push(self.read_u1().ok_or(EarlyEnd("bytecode"))?)
         }
@@ -87,10 +88,14 @@ impl<'a> CodeReader<'a> {
             });
         }
 
-        let exception_table_length = self.read_u2().unwrap();
-        code.exception_table
-            .reserve(exception_table_length as usize);
+        dbg!(&code.code);
 
+        let exception_table_length = self.read_u2().unwrap();
+        dbg!(exception_table_length);
+
+        code.exception_table.reserve(exception_table_length as usize);
+
+        dbg!(exception_table_length);
         for _ in 0..exception_table_length {
             code.exception_table.push(
                 self.read_exception_table_item()

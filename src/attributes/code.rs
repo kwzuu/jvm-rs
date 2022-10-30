@@ -1,4 +1,4 @@
-use crate::attribute_info::AttributeInfo;
+use crate::attributes::attribute_info::AttributeInfo;
 use crate::bytecode::Instruction;
 
 #[derive(Debug, Clone)]

@@ -1,4 +1,4 @@
-use crate::attribute_info::AttributeInfo;
+use crate::attributes::attribute_info::AttributeInfo;
 use crate::class_file::ClassFile;
 use crate::constant_pool::representations::*;
 use crate::constant_pool::ConstantPoolInfo;

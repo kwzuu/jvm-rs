@@ -1,4 +1,4 @@
-use crate::attribute_info::AttributeInfo;
+use crate::attributes::attribute_info::AttributeInfo;
 use crate::constant_pool::ConstantPoolInfo;
 use crate::field_info::FieldInfo;
 use crate::method_info::MethodInfo;

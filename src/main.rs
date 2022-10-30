@@ -1,15 +1,15 @@
+extern crate core;
+
 use crate::class::Class;
 use crate::class_reader::ClassReader;
 use crate::runtime::Runtime;
 use std::rc::Rc;
 
-mod attribute_info;
+mod attributes;
 mod bytecode;
 mod class;
 mod class_file;
 mod class_reader;
-mod code;
-mod code_reader;
 mod constant_pool;
 mod field_info;
 mod method;

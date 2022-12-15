@@ -1,11 +1,11 @@
 use crate::method::Method;
-use crate::things::Thing;
+use crate::things::Value;
 use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct StackFrame {
-    pub locals: Vec<Thing>,
-    pub operand_stack: Vec<Thing>,
+    pub locals: Vec<Value>,
+    pub operand_stack: Vec<Value>,
 }
 
 impl StackFrame {

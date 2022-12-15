@@ -1,6 +1,8 @@
 use crate::attributes::attribute_info::AttributeInfo;
 use crate::constant_pool::ConstantPoolInfo;
 use std::collections::HashMap;
+use std::fmt::{Debug, Display, Formatter};
+use crate::things::{Object, Value};
 
 #[derive(Debug)]
 pub struct FieldInfo {
@@ -11,12 +13,25 @@ pub struct FieldInfo {
     pub attributes: Vec<AttributeInfo>,
 }
 
+#[derive(Copy, Clone)]
+union AccessHelper {
+    offset: usize,
+    value: Value,
+}
+
+impl Debug for AccessHelper {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        <Value as Debug>::fmt(&unsafe { self.value }, f)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Field {
     pub access_flags: u16,
     pub name: String,
     pub descriptor: String,
     pub attributes: HashMap<String, Vec<u8>>,
+    pub access_helper: AccessHelper,
 }
 
 impl Field {
@@ -30,6 +45,7 @@ impl Field {
                 .utf8()
                 .expect("bad utf8 in field descriptor"),
             attributes: HashMap::new(),
+            access_helper: AccessHelper { offset: 0 }
         };
         for a in &fi.attributes {
             f.attributes.insert(
@@ -40,5 +56,25 @@ impl Field {
             );
         }
         f
+    }
+
+    pub fn get_instance(&self, obj: *const Object) -> Value {
+        unsafe {
+            (*obj).get(self.access_helper.offset)
+        }
+    }
+
+    pub fn get_static(&self) -> Value {
+        unsafe { self.access_helper.value }
+    }
+
+    pub fn set_instance(&self, obj: *mut Object, val: Value) {
+        unsafe {
+            (*obj).set(self.access_helper.offset, val)
+        }
+    }
+
+    pub fn set_static(&mut self, val: Value) {
+        self.access_helper = AccessHelper { value: val }
     }
 }

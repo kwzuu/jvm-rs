@@ -12,7 +12,7 @@ pub struct ClassReader {
 }
 
 impl ClassReader {
-    pub(crate) fn new(path: &String) -> Result<ClassReader, std::io::Error> {
+    pub fn new(path: &str) -> Result<ClassReader, std::io::Error> {
         let f: File = File::open(path)?;
         Ok(ClassReader { bytes: f.bytes() })
     }
@@ -147,7 +147,7 @@ impl ClassReader {
         a
     }
 
-    pub(crate) fn read_classfile(&mut self) -> ClassFile {
+    pub fn read_classfile(&mut self) -> ClassFile {
         let mut cf = ClassFile {
             magic: self.read_u4(),
             minor_version: self.read_u2(),

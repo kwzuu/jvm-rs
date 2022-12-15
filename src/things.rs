@@ -1,135 +1,93 @@
 use crate::Class;
 use std::rc::Rc;
+use std::fmt::{Display, Debug, Formatter};
 
-#[derive(Debug)]
+
+#[derive(Copy, Clone)]
+pub union Value {
+byte: i8,
+char: u16,
+short: i16,
+int: i32,
+long: i64,
+float: f32,
+double: f64,
+object: *mut Object,
+array: *mut Array,
+}
+
 pub struct Object {
-    class: Rc<Class>,
-    fields: Rc<[Thing]>,
+    class: *const Class,
+    // we allocate the object with more size than this, because if we made
+    // the size of the array variable it would make `Object` `!Sized`, making
+    // its pointers 2* fatter and making everything take up twice the memory
+    // (very bad for efficiency). this is just a placeholder area, we trick
+    // the compiler to keep Object `Sized` and secretly read/write past it.
+    fields: [Value; 0],
 }
 
-#[derive(Clone, Debug)]
-pub enum Thing {
-    Byte(i8),
-    Char(char),
-    Short(i16),
-    Int(i32),
-    Long(i64),
-    Float(f32),
-    Double(f64),
-    Object(Rc<Object>),
-    BArray(Rc<[i8]>),
-    CArray(Rc<[char]>),
-    SArray(Rc<[i16]>),
-    IArray(Rc<[i32]>),
-    LArray(Rc<[i64]>),
-    FArray(Rc<[f32]>),
-    DArray(Rc<[f64]>),
-    OArray(Rc<[Rc<Object>]>),
+impl Object {
+    pub fn get(&self, n: usize) -> Value {
+        unsafe { self.fields.get_unchecked(n).clone() }
+    }
+
+    pub fn set(&mut self, n: usize, val: Value) {
+        unsafe {
+            self.fields
+                .as_mut_ptr()
+                .add(n)
+                .write(val);
+
+        }
+    }
 }
 
-impl Thing {
-    pub fn byte(self) -> i8 {
-        if let Thing::Byte(x) = self {
-            return x;
-        }
-        panic!("TYPE ERROR")
-    }
+pub struct Array {
+    ptr: *mut (),
+    len: usize,
+}
 
-    pub fn char(self) -> char {
-        if let Thing::Char(x) = self {
-            return x;
-        }
-        panic!("TYPE ERROR")
-    }
+impl Value {
+  pub const DCONST_0: Self = Value { double: 0f64 };
+  pub const DCONST_1: Self = Value { double: 1f64 };
+ 
+  pub const FCONST_0: Self = Value { float: 0f32 };
+  pub const FCONST_1: Self = Value { float: 1f32 };
+  pub const FCONST_2: Self = Value { float: 2f32 };
 
-    pub fn int(self) -> i32 {
-        if let Thing::Int(x) = self {
-            return x;
-        }
-        panic!("TYPE ERROR")
-    }
+  pub const ICONST_M1: Self = Value { int: -1 };
+  pub const ICONST_0: Self = Value { int: 0 };
+  pub const ICONST_1: Self = Value { int: 1 };
+  pub const ICONST_2: Self = Value { int: 2 };
+  pub const ICONST_3: Self = Value { int: 3 };
+  pub const ICONST_4: Self = Value { int: 4 };
+  pub const ICONST_5: Self = Value { int: 5 };
 
-    pub fn long(self) -> i64 {
-        if let Thing::Long(x) = self {
-            return x;
-        }
-        panic!("TYPE ERROR")
-    }
+  pub const LCONST_0: Self = Value { long: 0 };
+  pub const LCONST_1: Self = Value { long: 1 };
 
-    pub fn float(self) -> f32 {
-        if let Thing::Float(x) = self {
-            return x;
-        }
-        panic!("TYPE ERROR")
-    }
+  pub fn nbyte(n: i8) -> Self { Self { byte: n } }
+  pub fn nchar(n: u16) -> Self { Self { char: n } }
+  pub fn nshort(n: i16) -> Self { Self { short: n } }
+  pub fn nint(n: i32) -> Self { Self { int: n } }
+  pub fn nlong(n: i64) -> Self { Self { long: n } }
 
-    pub fn double(self) -> f64 {
-        if let Thing::Double(x) = self {
-            return x;
-        }
-        panic!("TYPE ERROR")
-    }
+  pub fn nfloat(n: f32) -> Self { Self { float: n } }
+  pub fn ndouble(n: f64) -> Self { Self { double: n } }
 
-    pub fn object(self) -> Rc<Object> {
-        if let Thing::Object(x) = self {
-            return x;
-        }
-        panic!("TYPE ERROR")
-    }
+  pub fn int(self) -> i32 {
+    unsafe { self.int }
+  }
+}
 
-    pub fn abyte(self) -> Rc<[i8]> {
-        if let Thing::BArray(x) = self {
-            return x;
-        }
-        panic!("TYPE ERROR")
-    }
+impl Display for Value {
+  fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    f.write_str(&*format!("{:016x}", unsafe { self.long }))
+  }
+}
 
-    pub fn ashort(self) -> Rc<[i16]> {
-        if let Thing::SArray(x) = self {
-            return x;
-        }
-        panic!("TYPE ERROR")
-    }
-
-    pub fn achar(self) -> Rc<[char]> {
-        if let Thing::CArray(x) = self {
-            return x;
-        }
-        panic!("TYPE ERROR")
-    }
-
-    pub fn aint(self) -> Rc<[i32]> {
-        if let Thing::IArray(x) = self {
-            return x;
-        }
-        panic!("TYPE ERROR")
-    }
-
-    pub fn along(self) -> Rc<[i64]> {
-        if let Thing::LArray(x) = self {
-            return x;
-        }
-        panic!("TYPE ERROR")
-    }
-
-    pub fn afloat(self) -> Rc<[f32]> {
-        if let Thing::FArray(x) = self {
-            return x;
-        }
-        panic!("TYPE ERROR")
-    }
-
-    pub fn adouble(self) -> Rc<[f64]> {
-        if let Thing::DArray(x) = self {
-            return x;
-        }
-        panic!("TYPE ERROR")
-    }
-
-    pub fn aobject(self) -> Rc<[Rc<Object>]> {
-        if let Thing::OArray(x) = self {
-            return x;
-        }
-        panic!("TYPE ERROR")
-    }
+impl Debug for Value {
+  fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    f.write_str(&*format!("{:016x}", unsafe { self.long }))
+  }
 }

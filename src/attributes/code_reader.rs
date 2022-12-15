@@ -1,7 +1,7 @@
 use crate::attributes::attribute_info::AttributeInfo;
-use crate::bytecode::{BytecodeParseError, Instruction};
 use crate::attributes::code::{Code, ExceptionTableItem};
 use crate::attributes::code_reader::CodeParseError::{EarlyEnd, InvalidFormat};
+use crate::bytecode::{BytecodeParseError, Instruction};
 use std::slice::Iter;
 
 pub struct CodeReader<'a> {
@@ -93,7 +93,8 @@ impl<'a> CodeReader<'a> {
         let exception_table_length = self.read_u2().unwrap();
         // dbg!(exception_table_length);
 
-        code.exception_table.reserve(exception_table_length as usize);
+        code.exception_table
+            .reserve(exception_table_length as usize);
 
         // dbg!(exception_table_length);
         for _ in 0..exception_table_length {

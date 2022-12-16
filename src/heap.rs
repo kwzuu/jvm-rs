@@ -6,18 +6,18 @@ use std::ptr::null_mut;
 use crate::Class;
 use crate::things::Value;
 
-struct Chunk {
-    base: *mut Value,
-    curr: *mut Value,
-    end: *mut Value,
+struct Chunk<'a> {
+    base: *mut Value<'a>,
+    curr: *mut Value<'a>,
+    end: *mut Value<'a>,
 }
 
 const MEG: usize = 1 << 20;
 const XMX: usize = 16 * MEG;
 const XMS: usize = 1 * MEG;
 
-impl Chunk {
-    fn new(size: usize) -> Chunk {
+impl<'a> Chunk<'a> {
+    fn new(size: usize) -> Chunk<'a> {
         let layout = Layout::from_size_align(
             size,
             mem::align_of::<Value>()
@@ -56,12 +56,12 @@ impl Chunk {
     }
 }
 
-pub struct Heap {
-    chunks: Vec<Chunk>
+pub struct Heap<'a> {
+    chunks: Vec<Chunk<'a>>
 }
 
-impl Heap {
-    fn new() -> Heap {
+impl<'a> Heap<'a> {
+    fn new() -> Heap<'a> {
         let chunk_size = min(XMS, MEG);
         let chunk_count = XMS / chunk_size;
         let mut chunks = Vec::with_capacity(chunk_count);

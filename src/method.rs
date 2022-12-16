@@ -50,10 +50,10 @@ impl Method {
         class: *mut Class,
         stack_frame: &mut StackFrame,
     ) -> Option<Value> {
-        println!("{}.{} called", class.name, self.name);
+        println!("{}.{} called", unsafe { &*class }.name, self.name);
         let mut pc: usize = 0;
         let code = &self.code.clone().expect("called method with no code!");
-        let get_cpi = |x| class.constant_pool[x as usize - 1].clone();
+        let get_cpi = |x| unsafe { &*class }.constant_pool[x as usize - 1].clone();
         loop {
             match code.code[pc] {
                 Instruction::Iload0 => stack_frame
@@ -76,13 +76,13 @@ impl Method {
                         .name_and_type()
                         .unwrap();
 
-                    let cls = &get_cpi(called_class.name_index).utf8().unwrap();
-                    let name = &get_cpi(called_nameandtype.name_index).utf8().unwrap();
-                    let descriptor = &get_cpi(called_nameandtype.descriptor_index).utf8().unwrap();
+                    let cls = get_cpi(called_class.name_index).utf8().unwrap();
+                    let name = get_cpi(called_nameandtype.name_index).utf8().unwrap();
+                    let descriptor = get_cpi(called_nameandtype.descriptor_index).utf8().unwrap();
 
-                    let called = runtime.find_method(cls, name, descriptor).unwrap();
+                    let called = runtime.find_method(cls, &*name, &*descriptor).unwrap();
 
-                    let mut new_frame = StackFrame::new_for(called.clone());
+                    let mut new_frame = StackFrame::new_for(called);
 
                     let argc = descriptor::info(&*descriptor).args.len();
 

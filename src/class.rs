@@ -1,12 +1,9 @@
-use std::borrow::Borrow;
 use crate::class_file::ClassFile;
 use crate::constant_pool::ConstantPoolInfo;
 use crate::field_info::Field;
 use crate::method::Method;
 use crate::{ClassReader, Runtime};
 use std::collections::HashMap;
-use std::hash::Hash;
-use std::rc::Rc;
 use crate::things::Value;
 
 #[derive(Debug, Clone)]
@@ -15,7 +12,7 @@ pub struct Class<'a> {
     pub constant_pool: Vec<ConstantPoolInfo>,
     pub access_flags: u16,
     pub super_class: *mut Class<'a>,
-    pub interfaces: Vec<Rc<Class<'a>>>, // sorted
+    pub interfaces: Vec<*mut Class<'a>>, // sorted
     pub static_fields: HashMap<String, Field>,
     pub instance_fields: HashMap<String, Field>,
     pub methods: HashMap<(String, String), Method>, // (Name, Descriptor)
@@ -23,15 +20,15 @@ pub struct Class<'a> {
     pub field_order: Vec<String>
 }
 
-impl<'a> Class {
-    pub fn from_filename(name: &str, runtime: &mut Runtime) -> Result<Class, std::io::Error> {
+impl<'a> Class<'a> {
+    pub fn from_filename(name: &str, runtime: &mut Runtime) -> Result<Class<'a>, std::io::Error> {
         return Ok(Self::from_classfile(
             ClassReader::new(name)?.read_classfile(),
             runtime
         ));
     }
 
-    pub fn from_classfile(mut c: ClassFile, runtime: &mut Runtime) -> Class {
+    pub fn from_classfile(mut c: ClassFile, runtime: &mut Runtime) -> Class<'a> {
         let cp = &mut c.constant_pool;
 
         let mut cls = Class {
@@ -42,8 +39,10 @@ impl<'a> Class {
             interfaces: c
                 .interfaces
                 .iter()
-                .map(|x| c.constant_pool[(x - 1) as usize].class_name(new_cp))
-                .collect(),
+                .map(|x| &mut Class::from_filename(
+                    &*c.constant_pool[(x - 1) as usize].class_name(new_cp),
+                    runtime
+                ).unwrap() as *mut Class).collect(),
             static_fields: HashMap::new(),
             instance_fields: HashMap::new(),
             methods: HashMap::new(),
@@ -51,15 +50,20 @@ impl<'a> Class {
             field_order: vec![],
             constant_pool: cp.clone(),
         };
+
         for fi in &c.fields {
             let f = Field::from_info(new_cp, fi);
-            cls.field_order.insert(
-                cls.field_order.binary_search(&f.name)
-                    .err().unwrap(),
-                f.name.clone()
-            );
-            cls.fields.insert(f.name.clone(), Rc::new(f));
+            if f.is_static() {
+                cls.static_fields.insert(f.name.clone(), f);
+            } else {
+                cls.field_order.insert(
+                    cls.field_order.binary_search(&f.name)
+                        .unwrap_err(),
+                    f.name.clone()
+                );
+            }
         }
+
         for mi in &c.methods {
             let m = Method::from_info(new_cp, mi);
             cls.methods
@@ -84,7 +88,7 @@ impl<'a> Class {
     }
 
     pub fn set_static(&mut self, name: &str, val: Value) -> Result<(), ()> {
-        Ok(self.static_fields.get_mut(name).ok_or(Err(()))?.set_static(val))
+        Ok(self.static_fields.get_mut(name).ok_or(())?.set_static(val))
     }
 
     pub fn get_static(&self, name: &str) -> Option<Value> {

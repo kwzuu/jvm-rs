@@ -1,7 +1,7 @@
 use crate::attributes::attribute_info::AttributeInfo;
 use crate::constant_pool::ConstantPoolInfo;
 use std::collections::HashMap;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Formatter};
 use crate::things::{Object, Value};
 
 #[derive(Debug)]
@@ -14,9 +14,9 @@ pub struct FieldInfo {
 }
 
 #[derive(Copy, Clone)]
-union AccessHelper {
+union AccessHelper<'a> {
     offset: usize,
-    value: Value,
+    value: Value<'a>,
 }
 
 impl Debug for AccessHelper {
@@ -26,12 +26,12 @@ impl Debug for AccessHelper {
 }
 
 #[derive(Debug, Clone)]
-pub struct Field {
+pub struct Field<'a> {
     pub access_flags: u16,
     pub name: String,
     pub descriptor: String,
     pub attributes: HashMap<String, Vec<u8>>,
-    pub access_helper: AccessHelper,
+    pub access_helper: AccessHelper<'a>,
 }
 
 impl Field {
@@ -76,5 +76,9 @@ impl Field {
         unsafe {
             (*obj).set(self.access_helper.offset, val)
         }
+    }
+
+    pub fn is_static(&self) -> bool {
+        self.access_flags & 0x0008 != 0
     }
 }

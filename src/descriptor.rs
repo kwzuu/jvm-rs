@@ -78,7 +78,7 @@ pub fn type_from(partial_descriptor: &str) -> Type {
 
 mod tests {
     use crate::descriptor::Type::*;
-    use crate::descriptor::{args, info, DescriptorInfo};
+    use crate::descriptor::{info, DescriptorInfo};
 
     #[test]
     fn test_args() {

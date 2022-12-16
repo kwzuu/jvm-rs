@@ -4,7 +4,6 @@ extern crate core;
 use crate::class::Class;
 use crate::class_reader::ClassReader;
 use crate::runtime::Runtime;
-use std::rc::Rc;
 
 mod attributes;
 mod bytecode;

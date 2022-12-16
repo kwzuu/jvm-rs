@@ -14,9 +14,9 @@ pub struct FieldInfo {
 }
 
 #[derive(Copy, Clone)]
-union AccessHelper<'a> {
+union AccessHelper {
     offset: usize,
-    value: Value<'a>,
+    value: Value,
 }
 
 impl Debug for AccessHelper {
@@ -26,12 +26,12 @@ impl Debug for AccessHelper {
 }
 
 #[derive(Debug, Clone)]
-pub struct Field<'a> {
+pub struct Field {
     pub access_flags: u16,
     pub name: String,
     pub descriptor: String,
     pub attributes: HashMap<String, Vec<u8>>,
-    pub access_helper: AccessHelper<'a>,
+    access_helper: AccessHelper,
 }
 
 impl Field {

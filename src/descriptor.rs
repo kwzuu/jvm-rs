@@ -8,7 +8,7 @@ pub enum Type {
     Array(u8, Box<Type>),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct DescriptorInfo {
     pub ret: Type,
     pub args: Vec<Type>,

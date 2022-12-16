@@ -15,22 +15,24 @@ pub struct Method {
     pub name: String,
     pub access_flags: u16,
     pub descriptor: String,
+    pub parsed_descriptor: descriptor::DescriptorInfo,
     pub attributes: HashMap<String, Vec<u8>>,
     pub code: Option<Code>,
 }
 
 impl Method {
     pub fn from_info(cp: &Vec<ConstantPoolInfo>, mi: &MethodInfo) -> Method {
+        let desc = cp[(mi.descriptor_index - 1) as usize]
+            .utf8().expect("bad utf8 for method descriptor");
         let mut m = Method {
             name: cp[(mi.name_index - 1) as usize]
                 .utf8()
                 .expect("bad utf8 for method name"),
             access_flags: mi.access_flags,
             attributes: HashMap::new(),
-            descriptor: cp[(mi.descriptor_index - 1) as usize]
-                .utf8()
-                .expect("bad utf8 for method descriptor"),
             code: None,
+            parsed_descriptor: descriptor::info(&*desc),
+            descriptor: desc,
         };
         for ai in &mi.attributes {
             m.attributes.insert(
@@ -76,11 +78,12 @@ impl Method {
                         .name_and_type()
                         .unwrap();
 
-                    let cls = get_cpi(called_class.name_index).utf8().unwrap();
+                    let cls_name = get_cpi(called_class.name_index).utf8().unwrap();
                     let name = get_cpi(called_nameandtype.name_index).utf8().unwrap();
                     let descriptor = get_cpi(called_nameandtype.descriptor_index).utf8().unwrap();
 
-                    let called = runtime.find_method(cls, &*name, &*descriptor).unwrap();
+                    let cls = unsafe { &*runtime.load(cls_name).unwrap() };
+                    let called = cls.get_method(name, descriptor.clone()).unwrap();
 
                     let mut new_frame = StackFrame::new_for(called);
 

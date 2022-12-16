@@ -26,7 +26,7 @@ fn main() -> Result<(), std::io::Error> {
         panic!("argument needed")
     }
 
-    let mut runtime = Runtime::new(&*args[1])?;
+    let mut runtime = Runtime::new(args[1].clone())?;
 
     let _ = &mut runtime.run_main();
     Ok(())

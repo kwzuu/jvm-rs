@@ -4,7 +4,7 @@ use std::fmt::{Display, Debug, Formatter};
 
 
 #[derive(Copy, Clone)]
-pub union Value<'a> {
+pub union Value {
     byte: i8,
     char: u16,
     short: i16,
@@ -12,18 +12,19 @@ pub union Value<'a> {
     long: i64,
     float: f32,
     double: f64,
-    object: *mut Object<'a>,
+    object: *mut Object,
     array: *mut Array,
 }
 
-pub struct Object<'a> {
-    class: *const Class<'a>,
+pub struct Object {
+    // a pointer to the class the object is from
+    class: *const Class,
     // we allocate the object with more size than this, because if we made
     // the size of the array variable it would make `Object` `!Sized`, making
     // its pointers 2* fatter and making everything take up twice the memory
     // (very bad for efficiency). this is just a placeholder area, we trick
     // the compiler to keep Object `Sized` and secretly read/write past it.
-    fields: [Value<'a>; 0],
+    fields: [Value; 0],
 }
 
 impl Object {

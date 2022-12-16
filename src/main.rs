@@ -26,8 +26,8 @@ fn main() -> Result<(), std::io::Error> {
     if args.len() < 2 {
         panic!("argument needed")
     }
-    // dbg!(Class::from_classfile(ClassReader::new(&args[1].clone())?.read_classfile()));
-    let mut runtime = Runtime::new(Rc::new(args[1].clone()))?;
+
+    let mut runtime = Runtime::new(&*args[1])?;
 
     let _ = &mut runtime.run_main();
     Ok(())

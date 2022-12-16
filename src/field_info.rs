@@ -58,23 +58,23 @@ impl Field {
         f
     }
 
+    pub fn get_static(&self) -> Value {
+        unsafe { self.access_helper.value }
+    }
+
+    pub fn set_static(&mut self, val: Value) {
+        self.access_helper = AccessHelper { value: val }
+    }
+
     pub fn get_instance(&self, obj: *const Object) -> Value {
         unsafe {
             (*obj).get(self.access_helper.offset)
         }
     }
 
-    pub fn get_static(&self) -> Value {
-        unsafe { self.access_helper.value }
-    }
-
     pub fn set_instance(&self, obj: *mut Object, val: Value) {
         unsafe {
             (*obj).set(self.access_helper.offset, val)
         }
-    }
-
-    pub fn set_static(&mut self, val: Value) {
-        self.access_helper = AccessHelper { value: val }
     }
 }

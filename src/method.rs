@@ -47,7 +47,7 @@ impl Method {
     pub fn exec(
         &self,
         runtime: &mut Runtime,
-        class: Rc<Class>,
+        class: *mut Class,
         stack_frame: &mut StackFrame,
     ) -> Option<Value> {
         println!("{}.{} called", class.name, self.name);

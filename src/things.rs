@@ -1,5 +1,5 @@
 use crate::Class;
-use std::rc::Rc;
+
 use std::fmt::{Display, Debug, Formatter};
 
 
@@ -18,13 +18,13 @@ pub union Value {
 
 pub struct Object {
     // a pointer to the class the object is from
-    class: *const Class,
+    pub class: *const Class,
     // we allocate the object with more size than this, because if we made
     // the size of the array variable it would make `Object` `!Sized`, making
     // its pointers 2* fatter and making everything take up twice the memory
     // (very bad for efficiency). this is just a placeholder area, we trick
     // the compiler to keep Object `Sized` and secretly read/write past it.
-    fields: [Value; 0],
+    pub fields: [Value; 0],
 }
 
 impl Object {

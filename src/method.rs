@@ -1,14 +1,14 @@
 use crate::attributes::code::Code;
 use crate::attributes::code_reader::CodeReader;
 use crate::bytecode::Instruction;
-use crate::constant_pool::representations::MethodHandle;
+
 use crate::constant_pool::ConstantPoolInfo;
 use crate::method_info::MethodInfo;
 use crate::stack_frame::StackFrame;
 use crate::things::Value;
 use crate::{descriptor, Class, Runtime};
 use std::collections::HashMap;
-use std::rc::Rc;
+
 
 #[derive(Debug, Clone)]
 pub struct Method {

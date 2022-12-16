@@ -1,10 +1,10 @@
-use crate::field_info::Field;
+
 use crate::method::Method;
 use crate::stack_frame::StackFrame;
-use crate::{Class, ClassReader, main};
-use std::cell::RefCell;
+use crate::{Class, ClassReader};
+
 use std::collections::HashMap;
-use std::rc::Rc;
+
 use crate::descriptor::Type;
 
 pub struct Runtime {

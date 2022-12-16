@@ -1,20 +1,25 @@
 use std::alloc::{Layout, alloc, dealloc};
-use std::cmp::min;
+use std::cmp::{max, min};
+use std::collections::{HashMap, HashSet};
 use std::mem;
+use std::ops::Add;
 use std::ptr::null_mut;
 use crate::Class;
-use crate::things::Value;
+use crate::things::{Object, Value};
 
 struct Chunk {
     layout: Layout,
-    base: *mut Value,
-    curr: *mut Value,
-    end: *mut Value,
+    base: *mut Object,
+    curr: *mut Object,
+    end: *mut Object,
+    size: usize,
 }
 
 const MEG: usize = 1 << 20;
 const XMX: usize = 16 * MEG;
 const XMS: usize = 1 * MEG;
+
+const MIN_CHUNK_SIZE: usize = 1 * MEG;
 
 impl Chunk {
     fn new(size: usize) -> Chunk {
@@ -25,14 +30,15 @@ impl Chunk {
 
         let mem;
         unsafe {
-            mem = alloc(layout) as *mut Value;
+            mem = alloc(layout) as *mut Object;
         }
         
         Chunk {
             layout,
             base: mem,
             curr: mem,
-            end: unsafe { mem.add(size) }
+            end: unsafe { mem.add(size) },
+            size
         }
     }
 
@@ -40,7 +46,7 @@ impl Chunk {
         (self.base.byte_offset_from(self.curr)) as usize
     }
 
-    fn alloc(&mut self, cls: *const Class) -> *mut Value {
+    fn alloc(&mut self, cls: *const Class) -> *mut Object {
         let field_count;
         unsafe {
             field_count = (&*cls).instance_fields.len();
@@ -57,6 +63,39 @@ impl Chunk {
             p
         }
     }
+
+    fn size(&self) -> usize {
+        self.size
+    }
+
+    fn objects(&self) -> Objects {
+        Objects {
+            current: self.curr,
+            end: self.end
+        }
+    }
+}
+
+struct Objects {
+    current: *mut Object,
+    end: *mut Object,
+}
+
+impl Iterator for Objects {
+    type Item = *mut Object;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current > self.end {
+            return None
+        }
+        let ret = self.current;
+        let cls = unsafe { &*(&*self.current).class };
+        unsafe {
+            self.current = self.current
+                .add(cls.instance_fields.len() + 1)
+        }
+        Some(ret)
+    }
 }
 
 impl Drop for Chunk {
@@ -66,7 +105,8 @@ impl Drop for Chunk {
 }
 
 pub struct Heap {
-    chunks: Vec<Chunk>
+    bytes_allocated: usize,
+    chunks: Vec<Chunk>,
 }
 
 impl Heap {
@@ -78,7 +118,49 @@ impl Heap {
             chunks.push(Chunk::new(chunk_size));
         }
         Heap {
+            bytes_allocated: chunks.iter().map(Chunk::size).fold(0, usize::add),
             chunks
         }
+    }
+
+    fn add_chunk(&mut self, min_size: usize) -> Result<(), ()> {
+        let size = max(min_size, MIN_CHUNK_SIZE);
+        if self.bytes_allocated + size > XMX {
+            return Err(())
+        }
+        self.chunks.push(Chunk::new(size));
+        Ok(())
+    }
+
+    unsafe fn garbage_collect(&mut self) -> Vec<*mut Class> {
+        let classes_to_collect = vec![];
+
+        fn move_object(to: *mut Object, from: *mut Object) {
+            let cls = unsafe { &*((&*from).class) };
+            let fields = cls.instance_fields.len();
+            for i in 0..=fields {
+                unsafe {
+                    let from_val = (from as *mut Value).add(i).read();
+                    (to as *mut Value).add(i).write(from_val);
+                }
+            }
+        }
+
+        let marked: HashSet<*mut Value> = HashSet::new();
+        let mark = |obj: *mut Object| {
+
+        };
+
+        // step one: find all usages and mark them
+
+        for chunk in self.chunks.iter_mut() {
+            for obj in chunk.objects() {
+              
+            }
+        }
+
+        // step two: find all objects and kill them, putting rest of heap over old objects
+
+        classes_to_collect
     }
 }

@@ -63,7 +63,7 @@ pub fn args(descriptor: &str) -> Vec<Type> {
 }
 
 pub fn info(descriptor: &str) -> DescriptorInfo {
-    let mut index: usize = 0;
+    let index: usize = 0;
 
     DescriptorInfo {
         ret: type_from(&descriptor[index + 1..]),
@@ -78,7 +78,7 @@ pub fn type_from(partial_descriptor: &str) -> Type {
 
 mod tests {
     use crate::descriptor::Type::*;
-    use crate::descriptor::{info, DescriptorInfo};
+    use crate::descriptor::{info, args, DescriptorInfo};
 
     #[test]
     fn test_args() {

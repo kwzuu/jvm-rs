@@ -8,10 +8,63 @@ use crate::stack_frame::StackFrame;
 use crate::things::Value;
 use crate::{descriptor, Class, Runtime};
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
+use crate::descriptor::DescriptorInfo;
 
+#[derive(Debug)]
+pub enum Method {
+    Native(NativeMethod),
+    Java(JavaMethod),
+}
+
+impl Method {
+    pub fn from_info(cp: &Vec<ConstantPoolInfo>, mi: &MethodInfo) -> Method {
+        Method::Java(JavaMethod::from_info(cp, mi))
+    }
+
+    pub fn exec(
+        &self,
+        runtime: &mut Runtime,
+        class: *mut Class,
+        stack_frame: &mut StackFrame,
+    ) -> Option<Value> {
+        match self {
+            Method::Native(m) => (m.func)(m, runtime, class),
+            Method::Java(m) => m.exec(runtime, class, stack_frame)
+        }
+    }
+
+    pub fn descriptor(&self) -> &DescriptorInfo {
+        match self {
+            Method::Native(m) => &m.parsed_descriptor,
+            Method::Java(m) => &m.parsed_descriptor,
+        }
+    }
+}
+
+pub struct NativeMethod {
+    pub name: String,
+    pub access_flags: u16,
+    pub descriptor: String,
+    pub parsed_descriptor: DescriptorInfo,
+    pub func: Box<dyn Fn(&NativeMethod, &mut Runtime, *mut Class) -> Option<Value>>,
+}
+
+impl Debug for NativeMethod {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&*self.descriptor)?;
+        f.write_str(&*self.name)
+    }
+}
+
+impl NativeMethod {
+    pub fn argc(&self) -> usize {
+        self.parsed_descriptor.args.len()
+    }
+}
 
 #[derive(Debug, Clone)]
-pub struct Method {
+pub struct JavaMethod {
     pub name: String,
     pub access_flags: u16,
     pub descriptor: String,
@@ -20,11 +73,11 @@ pub struct Method {
     pub code: Option<Code>,
 }
 
-impl Method {
-    pub fn from_info(cp: &Vec<ConstantPoolInfo>, mi: &MethodInfo) -> Method {
+impl JavaMethod {
+    pub fn from_info(cp: &Vec<ConstantPoolInfo>, mi: &MethodInfo) -> JavaMethod {
         let desc = cp[(mi.descriptor_index - 1) as usize]
             .utf8().expect("bad utf8 for method descriptor");
-        let mut m = Method {
+        let mut m = JavaMethod {
             name: cp[(mi.name_index - 1) as usize]
                 .utf8()
                 .expect("bad utf8 for method name"),

@@ -1,4 +1,4 @@
-use crate::method::Method;
+use crate::method::{Method};
 use crate::things::Value;
 
 #[derive(Debug)]
@@ -9,10 +9,21 @@ pub struct StackFrame {
 
 impl StackFrame {
     pub fn new_for(m: &Method) -> StackFrame {
-        let code = m.code.as_ref().unwrap();
-        StackFrame {
-            locals: Vec::with_capacity(code.max_locals as usize),
-            operand_stack: Vec::with_capacity(code.max_stack as usize),
+        match m {
+            Method::Native(m) => {
+                StackFrame {
+                    locals: Vec::with_capacity(m.argc()),
+                    operand_stack: Vec::with_capacity(0),
+                }
+            }
+            Method::Java(m) => {
+                let code = m.code.as_ref().unwrap();
+                StackFrame {
+                    locals: Vec::with_capacity(code.max_locals as usize),
+                    operand_stack: Vec::with_capacity(code.max_stack as usize),
+                }
+            }
         }
+
     }
 }

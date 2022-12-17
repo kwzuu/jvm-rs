@@ -1,5 +1,5 @@
 
-use crate::method::Method;
+use crate::method::{Method};
 use crate::stack_frame::StackFrame;
 use crate::{Class, ClassReader};
 
@@ -15,14 +15,19 @@ pub struct Runtime {
 
 impl Runtime {
     pub fn new(main_class_path: String) -> Result<Runtime, std::io::Error> {
-        println!("loading class from {main_class_path}");
-
         let mut runtime = Runtime {
             main_class: 0 as *mut Class,
             path_to_main: main_class_path.clone(),
             loaded_classes: HashMap::new(),
         };
 
+        println!("loading builtin classes");
+        let classes = crate::base_classes::base_classes();
+        for c in classes {
+            runtime.loaded_classes.insert(c.name.clone(), c);
+        }
+
+        println!("loading class from {main_class_path}");
         let main_class = Class::from_filename(&main_class_path, &mut runtime)?;
         let name = main_class.name.clone();
         runtime.loaded_classes.insert(name.clone(), main_class);
@@ -60,6 +65,7 @@ impl Runtime {
             "main".to_string(),
             "([Ljava/lang/String;)V".to_string()
         );
+
         let int_main= |_| main_class.get_method(
             "main".to_string(),
             "()I".to_string()
@@ -87,7 +93,7 @@ impl Runtime {
             &mut frame
         ).unwrap();
 
-        match main_method.parsed_descriptor.ret {
+        match main_method.descriptor().ret {
             Type::Int => { dbg!(result.int()); },
             Type::Void => {},
             _ => panic!("unsupported return type!"),

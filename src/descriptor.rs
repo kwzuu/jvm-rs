@@ -2,9 +2,15 @@ use crate::descriptor::Type::{Array, Int, Object, Void};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Type {
-    Int,
     Void,
-    Object(String),
+    Byte,
+    Char,
+    Short,
+    Int,
+    Long,
+    Float,
+    Double,
+    Object(Box<String>),
     Array(u8, Box<Type>),
 }
 
@@ -44,8 +50,8 @@ pub fn types_from(arg_str: &str) -> Vec<Type> {
                         index += 1;
                     }
                     index += 1;
-                    Object(s)
-                }
+                    Object(Box::from(s))
+                },
                 c => panic!("invalid char {}", c),
             },
         ))
@@ -66,7 +72,7 @@ pub fn info(descriptor: &str) -> DescriptorInfo {
     let index: usize = 0;
 
     DescriptorInfo {
-        ret: type_from(&descriptor[index + 1..]),
+        ret: type_from(&descriptor[index + 2..]),
         args: args(descriptor),
     }
 }
@@ -78,19 +84,21 @@ pub fn type_from(partial_descriptor: &str) -> Type {
 
 mod tests {
     use crate::descriptor::Type::*;
-    use crate::descriptor::{info, args, DescriptorInfo};
+    use crate::descriptor::{info, DescriptorInfo};
 
     #[test]
     fn test_args() {
+        use super::args;
+
         assert_eq!(args("()V"), vec![]);
         assert_eq!(args("(VI)V"), vec![Void, Int]);
         assert_eq!(
             args("(VLjava/lang/String;I)V"),
-            vec![Void, Object("java/lang/String".to_string()), Int]
+            vec![Void, Object(Box::from("java/lang/String".to_string())), Int]
         );
         assert_eq!(
             args("([Ljava/lang/String;)V"),
-            vec![Array(1, Box::new(Object("java/lang/String".to_string())))]
+            vec![Array(1, Box::new(Object(Box::from("java/lang/String".to_string()))))]
         )
     }
 
@@ -99,7 +107,7 @@ mod tests {
             info("([Ljava/lang/String;)V"),
             DescriptorInfo {
                 ret: Void,
-                args: vec![Array(1, Box::new(Object("java/lang/String".to_string())))]
+                args: vec![Array(1, Box::new(Object(Box::from("java/lang/String".to_string()))))]
             }
         )
     }

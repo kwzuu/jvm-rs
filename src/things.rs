@@ -76,6 +76,9 @@ impl Value {
     pub fn nfloat(n: f32) -> Self { Self { float: n } }
     pub fn ndouble(n: f64) -> Self { Self { double: n } }
 
+    pub fn narray(a: *mut Array) -> Self { Self { array: a }}
+    pub fn nobject(o: *mut Object) -> Self { Self { object: o }}
+
     pub fn byte(self) -> i8 { unsafe { self.byte } }
     pub fn short(self) -> i16 { unsafe { self.short } }
     pub fn char(self) -> u16 { unsafe { self.char } }
@@ -84,6 +87,9 @@ impl Value {
 
     pub fn float(self) -> f32 { unsafe { self.float } }
     pub fn double(self) -> f64 { unsafe { self.double } }
+
+    pub fn array(self) -> *mut Array { unsafe { self.array } }
+    pub fn object(self) -> *mut Object { unsafe { self.object } }
 }
 
 impl Display for Value {

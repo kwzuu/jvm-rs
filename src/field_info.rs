@@ -81,4 +81,8 @@ impl Field {
     pub fn is_static(&self) -> bool {
         self.access_flags & 0x0008 != 0
     }
+
+    pub fn is_object(&self) -> bool {
+        self.descriptor.chars().nth(0).unwrap() == 'L'
+    }
 }

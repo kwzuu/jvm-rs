@@ -1,4 +1,5 @@
 #![feature(pointer_byte_offsets)]
+#![allow(dead_code)]
 extern crate core;
 
 use crate::class::Class;
@@ -19,6 +20,7 @@ mod runtime;
 mod stack_frame;
 mod things;
 mod heap;
+mod base_classes;
 
 fn main() -> Result<(), std::io::Error> {
     let args: Vec<String> = std::env::args().collect();

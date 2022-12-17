@@ -1,12 +1,12 @@
 use crate::class_file::ClassFile;
 use crate::constant_pool::ConstantPoolInfo;
 use crate::field_info::Field;
-use crate::method::Method;
+use crate::method::{JavaMethod, Method};
 use crate::{ClassReader, Runtime};
 use std::collections::HashMap;
 use crate::things::Value;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Class {
     pub name: String,
     pub constant_pool: Vec<ConstantPoolInfo>,
@@ -65,9 +65,9 @@ impl<'a> Class {
         }
 
         for mi in &c.methods {
-            let m = Method::from_info(cp, mi);
+            let m = JavaMethod::from_info(cp, mi);
             cls.methods
-                .insert((m.name.clone(), m.descriptor.clone()), m);
+                .insert((m.name.clone(), m.descriptor.clone()), Method::Java(m));
         }
         for a in &c.attributes {
             cls.attributes.insert(

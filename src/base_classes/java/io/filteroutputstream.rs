@@ -1,14 +1,11 @@
-use std::ptr::null_mut;
-use crate::Class;
+use crate::{Class, Runtime};
 
-pub fn base_classes() -> Vec<Class> {
-    let mut classes = vec![];
-
-    let object = Class {
+pub fn filteroutputstream(runtime: &mut Runtime) {
+    let fos = Class {
         name: "java/lang/Object".to_string(),
         constant_pool: vec![],
         access_flags: 0,
-        super_class: null_mut(),
+        super_class: runtime.get_class("java/io/OutputStream"),
         interfaces: vec![],
         static_fields: Default::default(),
         instance_fields: Default::default(),
@@ -16,8 +13,4 @@ pub fn base_classes() -> Vec<Class> {
         attributes: Default::default(),
         field_order: vec![]
     };
-
-    classes.push(object);
-
-    classes
 }

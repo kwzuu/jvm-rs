@@ -1,19 +1,17 @@
 use std::ptr::null_mut;
 use crate::{JavaClass, Runtime};
+use crate::class::{NativeClass, access_flags::*};
 
 pub fn object(runtime: &mut Runtime) {
-    runtime.add_class(
-        JavaClass {
+    runtime.add_native_class(
+        NativeClass {
             name: "java/lang/Object".to_string(),
-            constant_pool: vec![],
-            access_flags: 0,
+            access_flags: PUBLIC,
             super_class: null_mut(),
             interfaces: vec![],
             static_fields: Default::default(),
             instance_fields: Default::default(),
             methods: Default::default(),
-            attributes: Default::default(),
-            field_order: vec![]
         }
     )
 }

@@ -1,6 +1,10 @@
 use crate::method::{Method};
 use crate::things::Value;
 
+struct Stack {
+    frames: Vec<StackFrame>,
+}
+
 #[derive(Debug)]
 pub struct StackFrame {
     pub locals: Vec<Value>,

@@ -4,7 +4,8 @@ use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::mem;
 use std::ops::Add;
-use std::ptr::null_mut;
+use std::ptr::{null, null_mut};
+use crate::class::Class;
 
 use crate::JavaClass;
 
@@ -96,7 +97,7 @@ impl Iterator for Objects {
         let cls = unsafe { &*(&*self.current).class };
         unsafe {
             self.current = self.current
-                .add(cls.instance_fields.len() + 1)
+                .add(cls.instance_fields().count() + 1)
         }
         Some(ret)
     }
@@ -142,20 +143,20 @@ impl Heap {
     ///
     /// * `roots`: an iterator over the roots of the runtime
     ///
-    /// returns: HashSet<*mut Class, Global>
+    /// returns: HashSet<*const Class, Global>
     /// the classes still used by the runtime
     /// any classes non-present can be safely KILLED and MURDERED
-    unsafe fn garbage_collect(&mut self, roots: &mut dyn Iterator<Item=*mut Object>) -> HashSet<*const JavaClass> {
+    unsafe fn garbage_collect(&mut self, roots: &mut dyn Iterator<Item=*mut Object>) -> HashSet<*const Class> {
         let mut classes_to_save = HashSet::new();
 
-        fn add_class(cls: *const JavaClass, classes_to_save: &mut HashSet<*const JavaClass>) {
+        fn add_class(cls: *const Class, classes_to_save: &mut HashSet<*const Class>) {
             unsafe {
                 classes_to_save.insert(cls);
-                let super_class = (&*cls).super_class;
+                let super_class = (&*cls).super_class();
                 if super_class != null_mut() {
                     add_class(super_class, classes_to_save);
                 }
-                for interface in &(&*cls).interfaces {
+                for interface in (&*cls).interfaces() {
                     add_class(*interface, classes_to_save);
                 }
             }
@@ -167,12 +168,16 @@ impl Heap {
         //     marked.insert(RefType { arr });
         // };
 
-        fn mark_object(obj: *mut Object, marked: &mut HashSet<*mut Object>, classes_to_save: &mut HashSet<*const JavaClass>) {
+        fn mark_object(
+            obj: *mut Object,
+            marked: &mut HashSet<*mut Object>,
+            classes_to_save: &mut HashSet<*const Class>
+        ) {
             marked.insert(obj);
             unsafe {
                 let cls = &*((&*obj).class);
                 add_class((&*obj).class, classes_to_save);
-                for (_, field) in cls.instance_fields.iter() {
+                for (_, field) in cls.instance_fields() {
                     if field.is_object() {
                         mark_object(field.get_instance(obj).object(), marked, classes_to_save)
                     }
@@ -190,7 +195,7 @@ impl Heap {
 
         fn size_of(obj: *mut Object) -> usize {
             let cls = unsafe { &*((&*obj).class) };
-            cls.instance_fields.len() + 1
+            cls.instance_fields().count() + 1
         }
 
         // returns how many words to skip to find the next object

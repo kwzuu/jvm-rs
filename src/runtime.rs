@@ -35,8 +35,8 @@ impl Runtime {
         let name = main_class.name.clone();
         runtime.loaded_classes.insert(name.clone(), Class::Java(main_class));
         runtime.main_class = runtime.loaded_classes
-            .get_mut(&*name)
-            .unwrap() as *mut JavaClass;
+            .get_mut(&name).unwrap()
+            .java_mut().unwrap();
 
         Ok(runtime)
     }
@@ -46,9 +46,9 @@ impl Runtime {
         Value::nobject(null_mut())
     }
 
-    pub fn load(&mut self, name: String) -> Result<*mut JavaClass, std::io::Error> {
+    pub fn load(&mut self, name: String) -> Result<*mut Class, std::io::Error> {
         if let Some(cls) = self.loaded_classes.get_mut(&name) {
-            return Ok(cls as *mut JavaClass);
+            return Ok(cls as *mut Class);
         }
 
         println!("searching for {name}.class");
@@ -60,7 +60,7 @@ impl Runtime {
 
         self.add_java_class(cls);
 
-        return Ok(self.loaded_classes.get_mut(&name).unwrap() as *mut JavaClass);
+        return Ok(self.loaded_classes.get_mut(&name).unwrap() as *mut Class);
     }
 
     pub fn run_main<'a>(self: &mut Self) {
@@ -105,7 +105,7 @@ impl Runtime {
     }
 
     pub fn add_class(&mut self, cls: Class) {
-        self.loaded_classes.insert(cls.name.clone(), cls);
+        self.loaded_classes.insert(cls.name().to_string(), cls);
     }
 
     pub fn add_native_class(&mut self, cls: NativeClass) {
@@ -116,9 +116,9 @@ impl Runtime {
         self.loaded_classes.insert(cls.name.clone(), Class::Java(cls));
     }
 
-    pub fn get_class(&mut self, name: &str) -> Result<*mut JavaClass, String> {
+    pub fn get_class(&mut self, name: &str) -> Result<*mut Class, String> {
         self.loaded_classes.get_mut(name)
-            .map(|x| x as *mut JavaClass)
+            .map(|x| x as *mut Class)
             .ok_or_else(|| name.to_string())
     }
 }

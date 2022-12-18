@@ -11,9 +11,7 @@ pub fn closeable(runtime: &mut Runtime) {
         static_fields: Default::default(),
         instance_fields: Default::default(),
         methods: Default::default(),
-        attributes: Default::default(),
-        field_order: vec![]
     };
 
-    runtime.add_class(fos);
+    runtime.add_native_class(fos);
 }

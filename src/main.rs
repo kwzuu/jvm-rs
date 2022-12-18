@@ -1,4 +1,5 @@
 #![feature(pointer_byte_offsets)]
+#![feature(fn_traits)]
 #![allow(dead_code)]
 extern crate core;
 

@@ -1,22 +1,95 @@
+use std::collections::hash_map::Iter;
 use crate::class_file::ClassFile;
 use crate::constant_pool::ConstantPoolInfo;
 use crate::field_info::Field;
 use crate::method::{JavaMethod, Method};
 use crate::{ClassReader, Runtime};
 use std::collections::HashMap;
+use crate::class::Class::{Java, Native};
 use crate::things::Value;
+
+pub(crate) mod access_flags {
+    pub const PUBLIC: u16 = 0x0001;
+    pub const FINAL: u16 = 0x0010;
+    pub const SUPER: u16 = 0x0020;
+    pub const INTERFACE: u16 = 0x0200;
+    pub const ABSTRACT: u16 = 0x0400;
+    pub const SYNTHETIC: u16 = 0x1000;
+    pub const ANNOTATION: u16 = 0x2000;
+    pub const ENUM: u16 = 0x4000;
+}
 
 pub enum Class {
     Java(JavaClass),
     Native(NativeClass),
 }
 
+impl Class {
+    pub fn instance_fields(&self) -> Iter<'_, String, Field> {
+        match self {
+            Java(c) => c.instance_fields.iter(),
+            Native(c) => c.instance_fields.iter(),
+        }
+    }
+
+    pub fn interfaces(&self) -> &Vec<*mut Class> {
+        match self {
+            Java(c) => &c.interfaces,
+            Native(c) => &c.interfaces,
+        }
+    }
+
+    pub fn super_class(&self) -> *mut Class {
+        match self {
+            Java(c) => c.super_class,
+            Native(c) => c.super_class
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        match self {
+            Java(c) => &*c.name,
+            Native(c) => &*c.name,
+        }
+    }
+
+    pub fn java(&self) -> Option<*const JavaClass> {
+        match self {
+            Java(c) => Some(c as *const JavaClass),
+            Native(_) => None
+        }
+    }
+
+    pub fn java_mut(&mut self) -> Option<*mut JavaClass> {
+        match self {
+            Java(c) => Some(c as *mut JavaClass),
+            Native(_) => None
+        }
+    }
+
+    pub fn get_method(&self, name: String, descriptor: String) -> Option<&Method> {
+        match self {
+            Java(c) => c.methods.get(&(name, descriptor)),
+            Native(c) => c.methods.get(&(name, descriptor)),
+        }
+    }
+
+    pub fn get_static(&self, name: &str) -> Option<Value> {
+        match self {
+            Java(c) => &c.static_fields,
+            Native(c) => &c.static_fields,
+        }.get(name).map(Field::get_static)
+    }
+}
+
 pub struct NativeClass {
     pub name: String,
     pub access_flags: u16,
-    pub super_class: *mut NativeClass,
-    pub interfaces: Vec<*mut NativeClass>,
-    pub static_fields: HashMap<(String, String), Field>,
+    pub super_class: *mut Class,
+    pub interfaces: Vec<*mut Class>,
+    pub static_fields: HashMap<String, Field>,
+    pub instance_fields: HashMap<String, Field>,
+    pub methods: HashMap<(String, String), Method>,
 }
 
 #[derive(Debug)]
@@ -26,8 +99,8 @@ pub struct JavaClass {
     pub access_flags: u16,
     pub super_class: *mut Class,
     pub interfaces: Vec<*mut Class>, // sorted
-    pub static_fields: HashMap<(String, String), Field>,
-    pub instance_fields: HashMap<(String, String), Field>,
+    pub static_fields: HashMap<String, Field>,
+    pub instance_fields: HashMap<String, Field>,
     pub methods: HashMap<(String, String), Method>, // (Name, Descriptor)
     pub attributes: HashMap<String, Vec<u8>>,           // String is name, Vec is data
 }
@@ -48,13 +121,12 @@ impl<'a> JavaClass {
             name: cp[(c.this_class - 1) as usize].class_name(cp),
             super_class: runtime.load(cp[(c.super_class - 1) as usize].class_name(cp))
                 .expect("loading super class failed!"),
-            interfaces: c
-                .interfaces
-                .iter()
-                .map(|x| &mut JavaClass::from_filename(
-                    &*cp[(x - 1) as usize].class_name(cp),
-                    runtime
-                ).unwrap() as *mut JavaClass).collect(),
+            interfaces: c.interfaces.iter()
+                .map(|x|
+                    runtime.load(
+                        cp[(x - 1) as usize].utf8().unwrap()
+                    ).unwrap()
+                ).collect(),
             static_fields: HashMap::new(),
             instance_fields: HashMap::new(),
             methods: HashMap::new(),
@@ -65,14 +137,10 @@ impl<'a> JavaClass {
         for fi in &c.fields {
             let f = Field::from_info(cp, fi);
             if f.is_static() {
-                cls.static_fields.insert((f.name.clone(), f.descriptor.clone()), f);
+                &mut cls.static_fields
             } else {
-                cls.field_order.insert(
-                    cls.field_order.binary_search(&f.name)
-                        .unwrap_err(),
-                    f.name.clone()
-                );
-            }
+                &mut cls.instance_fields
+            }.insert(f.name.clone(), f);
         }
 
         for mi in &c.methods {
@@ -98,15 +166,15 @@ impl<'a> JavaClass {
         return Err(());
     }
 
-    pub fn set_static(&mut self, field: &(String, String), val: Value) -> Result<(), ()> {
+    pub fn set_static(&mut self, field: &str, val: Value) -> Result<(), ()> {
         Ok(self.static_fields.get_mut(field).ok_or(())?.set_static(val))
     }
 
-    pub fn get_static(&self, field: &(String, String)) -> Option<Value> {
+    pub fn get_static(&self, field: &str) -> Option<Value> {
         Some(self.static_fields.get(field)?.get_static())
     }
 
-    pub fn get_instance_field(&'a self, field: &(String, String)) -> Result<&'a Field, ()> {
+    pub fn get_instance_field(&'a self, field: &str) -> Result<&'a Field, ()> {
         self.instance_fields.get(field).ok_or(())
     }
 }

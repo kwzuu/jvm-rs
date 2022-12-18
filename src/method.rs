@@ -29,7 +29,10 @@ impl Method {
         stack_frame: &mut StackFrame,
     ) -> Option<Value> {
         match self {
-            Method::Native(m) => (m.func)(m, runtime, class),
+            Method::Native(m) => {
+                let f = &m.func;
+                f.call((m, runtime, class))
+            },
             Method::Java(m) => m.exec(runtime, class, stack_frame)
         }
     }
@@ -144,12 +147,9 @@ impl JavaMethod {
                     let nt = get_cpi(field.name_and_type_index)
                         .name_and_type().unwrap();
 
-                    let name_descriptor = (
-                        get_cpi(nt.name_index).utf8().unwrap(),
-                        get_cpi(nt.descriptor_index).utf8().unwrap(),
-                    );
+                    let name = get_cpi(nt.name_index).utf8().unwrap();
 
-                    let val = unsafe { &*cls }.get_static(&name_descriptor).unwrap();
+                    let val = unsafe { &*cls }.get_static(&name).unwrap();
                     stack_frame.operand_stack.push(val);
                 }
                 Instruction::Invokestatic(n) => {

@@ -1,6 +1,7 @@
 use crate::JavaClass;
 
 use std::fmt::{Display, Debug, Formatter};
+use crate::class::Class;
 
 
 #[derive(Copy, Clone)]
@@ -18,7 +19,7 @@ pub union Value {
 
 pub struct Object {
     // a pointer to the class the object is from
-    pub class: *const JavaClass,
+    pub class: *const Class,
     // we allocate the object with more size than this, because if we made
     // the size of the array variable it would make `Object` `!Sized`, making
     // its pointers 2* fatter and making everything take up twice the memory

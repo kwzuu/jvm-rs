@@ -131,6 +131,14 @@ impl ConstantPoolInfo {
         }
     }
 
+    pub fn fieldref(&self) -> Option<Fieldref> {
+        if let ConstantPoolInfo::Fieldref(fr) = self {
+            Some(fr.clone())
+        } else {
+            None
+        }
+    }
+
     pub fn method_type(&self) -> Option<MethodType> {
         if let ConstantPoolInfo::MethodType(mt) = self {
             Some(mt.clone())

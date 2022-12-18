@@ -1,9 +1,9 @@
-use crate::{JavaClass, Runtime};
+use crate::{Runtime};
 use crate::class::NativeClass;
 
 pub fn printstream(runtime: &mut Runtime) {
     let ps = NativeClass {
-        name: "java/io/PrintSteam".to_string(),
+        name: "java/io/PrintStream".to_string(),
         access_flags: 0,
         super_class: runtime.get_class("java/io/FilterOutputStream").unwrap(),
         interfaces: vec![

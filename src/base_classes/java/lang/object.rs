@@ -1,5 +1,5 @@
 use std::ptr::null_mut;
-use crate::{JavaClass, Runtime};
+use crate::{Runtime};
 use crate::class::{NativeClass, access_flags::*};
 
 pub fn object(runtime: &mut Runtime) {

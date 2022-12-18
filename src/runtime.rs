@@ -1,15 +1,19 @@
-
 use crate::method::{Method};
 use crate::stack_frame::StackFrame;
 use crate::{JavaClass, ClassReader};
 
 use std::collections::HashMap;
-use std::ptr::{null, null_mut};
+use std::ptr::{null_mut};
 
 use crate::class::{Class, NativeClass};
 use crate::descriptor::Type;
 use crate::heap::Heap;
 use crate::things::Value;
+
+pub const CLASSPATH: &[&str] = &[
+    "./",
+    "std/class/",
+];
 
 pub struct Runtime {
     main_class: *mut JavaClass,
@@ -46,21 +50,28 @@ impl Runtime {
         Value::nobject(null_mut())
     }
 
-    pub fn load(&mut self, name: String) -> Result<*mut Class, std::io::Error> {
+    pub fn load(&mut self, name: String) -> Result<*mut Class, ()> {
         if let Some(cls) = self.loaded_classes.get_mut(&name) {
             return Ok(cls as *mut Class);
         }
 
         println!("searching for {name}.class");
 
+        fn get_reader(class_name: &str) -> Option<ClassReader> {
+            let paths = CLASSPATH.iter()
+                .map(|x| (x.to_string() + class_name + ".class"));
+
+            paths.map(|x| ClassReader::new(&*x)).filter_map(Result::ok).next()
+        }
+
         let cls = JavaClass::from_classfile(
-            ClassReader::new(&(name.clone() + ".class"))?.read_classfile(),
+            get_reader(&*name).ok_or(())?.read_classfile(),
             self
         );
 
         self.add_java_class(cls);
 
-        return Ok(self.loaded_classes.get_mut(&name).unwrap() as *mut Class);
+        Ok(self.loaded_classes.get_mut(&name).unwrap() as *mut Class)
     }
 
     pub fn run_main<'a>(self: &mut Self) {

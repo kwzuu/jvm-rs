@@ -1,4 +1,4 @@
-use crate::{JavaClass, Runtime};
+use crate::{Runtime};
 use crate::class::NativeClass;
 
 pub fn filteroutputstream(runtime: &mut Runtime) {

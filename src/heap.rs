@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::mem;
 use std::ops::Add;
-use std::ptr::{null, null_mut};
+use std::ptr::{null_mut};
 use crate::class::Class;
 
 use crate::JavaClass;

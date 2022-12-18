@@ -1,5 +1,5 @@
 use std::ptr::null_mut;
-use crate::{JavaClass, Runtime};
+use crate::{Runtime};
 use crate::class::NativeClass;
 
 pub fn appendable(runtime: &mut Runtime) {

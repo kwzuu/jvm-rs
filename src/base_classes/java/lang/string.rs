@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use std::ptr::null_mut;
-use crate::{JavaClass, Runtime};
+
+use crate::{Runtime};
 use crate::class::NativeClass;
-use crate::field_info::Field;
+
 
 pub fn string(runtime: &mut Runtime) {
     let s = NativeClass {
@@ -12,7 +12,7 @@ pub fn string(runtime: &mut Runtime) {
         interfaces: vec![],
         static_fields: Default::default(),
         instance_fields: {
-            let mut m = HashMap::new();
+            let m = HashMap::new();
 
             // m.insert("_data".to_string(), Field {
             //     access_flags: 0,

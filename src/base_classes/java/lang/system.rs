@@ -1,12 +1,9 @@
 use std::collections::HashMap;
-use crate::{JavaClass, Runtime};
+use crate::{Runtime};
 use crate::class::NativeClass;
-use crate::field_info::{AccessHelper, Field};
-use crate::stack_frame::StackFrame;
-use crate::things::Value;
 
-pub(crate) fn system(runtime: &mut Runtime) {
-    let printstream = runtime.get_class("java/io/PrintStream").unwrap();
+pub fn system(runtime: &mut Runtime) {
+    let _printstream = runtime.get_class("java/io/PrintStream").unwrap();
 
     let system = NativeClass {
         name: "java/lang/System".to_string(),
@@ -56,7 +53,7 @@ pub(crate) fn system(runtime: &mut Runtime) {
             //     access_helper: ()
             // };
 
-            let mut m = HashMap::new();
+            let m = HashMap::new();
 
             // m.insert(("in".to_string(), "Ljava/io/PrintSteam".to_string()), ps_in_field);
             // m.insert(("out".to_string(), "Ljava/io/PrintSteam".to_string()), ps_out_field);

@@ -6,7 +6,7 @@ use std::mem;
 use std::ops::Add;
 use std::ptr::null_mut;
 
-use crate::Class;
+use crate::JavaClass;
 
 use crate::things::{Array, Object, Value};
 
@@ -46,14 +46,11 @@ impl Chunk {
     }
 
     unsafe fn remaining_bytes(&self) -> usize {
-        (self.base.byte_offset_from(self.curr)) as usize
+        (self.curr.byte_offset_from(self.base)) as usize
     }
 
-    fn alloc(&mut self, cls: *const Class) -> *mut Object {
-        let field_count;
-        unsafe {
-            field_count = (&*cls).instance_fields.len();
-        }
+    fn alloc(&mut self, cls: *const JavaClass) -> *mut Object {
+        let field_count= unsafe { (&*cls).instance_fields.len() };
 
         if field_count > unsafe { self.remaining_bytes() } {
             null_mut()
@@ -61,7 +58,7 @@ impl Chunk {
             let p = self.curr;
             unsafe {
                 self.curr = self.curr.add(field_count);
-                *(p as *mut *const Class) = cls;
+                *(p as *mut *const JavaClass) = cls;
             }
             p
         }
@@ -117,7 +114,7 @@ pub struct Heap {
 }
 
 impl Heap {
-    fn new() -> Heap {
+    pub fn new() -> Heap {
         let chunk_size = min(XMS, MEG);
         let chunk_count = XMS / chunk_size;
         let mut chunks = Vec::with_capacity(chunk_count);
@@ -148,10 +145,10 @@ impl Heap {
     /// returns: HashSet<*mut Class, Global>
     /// the classes still used by the runtime
     /// any classes non-present can be safely KILLED and MURDERED
-    unsafe fn garbage_collect(&mut self, roots: &mut dyn Iterator<Item=*mut Object>) -> HashSet<*const Class> {
+    unsafe fn garbage_collect(&mut self, roots: &mut dyn Iterator<Item=*mut Object>) -> HashSet<*const JavaClass> {
         let mut classes_to_save = HashSet::new();
 
-        fn add_class(cls: *const Class, classes_to_save: &mut HashSet<*const Class>) {
+        fn add_class(cls: *const JavaClass, classes_to_save: &mut HashSet<*const JavaClass>) {
             unsafe {
                 classes_to_save.insert(cls);
                 let super_class = (&*cls).super_class;
@@ -170,7 +167,7 @@ impl Heap {
         //     marked.insert(RefType { arr });
         // };
 
-        fn mark_object(obj: *mut Object, marked: &mut HashSet<*mut Object>, classes_to_save: &mut HashSet<*const Class>) {
+        fn mark_object(obj: *mut Object, marked: &mut HashSet<*mut Object>, classes_to_save: &mut HashSet<*const JavaClass>) {
             marked.insert(obj);
             unsafe {
                 let cls = &*((&*obj).class);

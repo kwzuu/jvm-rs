@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use crate::things::{Object, Value};
 
+
 #[derive(Debug)]
 pub struct FieldInfo {
     pub access_flags: u16,
@@ -14,9 +15,9 @@ pub struct FieldInfo {
 }
 
 #[derive(Copy, Clone)]
-union AccessHelper {
+pub union AccessHelper {
     offset: usize,
-    value: Value,
+    pub(crate) value: Value,
 }
 
 impl Debug for AccessHelper {
@@ -31,7 +32,7 @@ pub struct Field {
     pub name: String,
     pub descriptor: String,
     pub attributes: HashMap<String, Vec<u8>>,
-    access_helper: AccessHelper,
+    pub(crate) access_helper: AccessHelper,
 }
 
 impl Field {

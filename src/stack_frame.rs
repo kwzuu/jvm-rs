@@ -18,9 +18,14 @@ impl StackFrame {
             }
             Method::Java(m) => {
                 let code = m.code.as_ref().unwrap();
+                let mut local_count = code.max_locals;
+                if !m.is_static() {
+                    local_count += 1;
+                }
+                let null = Value::nlong(0);
                 StackFrame {
-                    locals: Vec::with_capacity(code.max_locals as usize),
-                    operand_stack: Vec::with_capacity(code.max_stack as usize),
+                    locals: vec![null; local_count as usize],
+                    operand_stack: vec![null; code.max_stack as usize],
                 }
             }
         }

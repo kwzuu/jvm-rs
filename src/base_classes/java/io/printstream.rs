@@ -1,7 +1,7 @@
-use crate::{Class, Runtime};
+use crate::{JavaClass, Runtime};
 
 pub fn printstream(runtime: &mut Runtime) {
-    let ps = Class {
+    let ps = JavaClass {
         name: "java/io/PrintSteam".to_string(),
         constant_pool: vec![],
         access_flags: 0,

@@ -1,66 +1,70 @@
 
 use crate::method::{Method};
 use crate::stack_frame::StackFrame;
-use crate::{Class, ClassReader};
+use crate::{JavaClass, ClassReader};
 
 use std::collections::HashMap;
+use std::ptr::{null, null_mut};
 
+use crate::class::{Class, NativeClass};
 use crate::descriptor::Type;
+use crate::heap::Heap;
+use crate::things::Value;
 
 pub struct Runtime {
-    main_class: *mut Class,
+    main_class: *mut JavaClass,
     path_to_main: String,
     loaded_classes: HashMap<String, Class>, // name:class
+    pub(crate) heap: Heap,
 }
 
 impl Runtime {
     pub fn new(main_class_path: String) -> Result<Runtime, std::io::Error> {
         let mut runtime = Runtime {
-            main_class: 0 as *mut Class,
+            main_class: 0 as *mut JavaClass,
             path_to_main: main_class_path.clone(),
             loaded_classes: HashMap::new(),
+            heap: Heap::new(),
         };
 
         println!("loading builtin classes");
-        let classes = crate::base_classes::base_classes();
-        for c in classes {
-            runtime.loaded_classes.insert(c.name.clone(), c);
-        }
+        crate::base_classes::base_classes(&mut runtime);
 
         println!("loading class from {main_class_path}");
-        let main_class = Class::from_filename(&main_class_path, &mut runtime)?;
+        let main_class = JavaClass::from_filename(&main_class_path, &mut runtime)?;
         let name = main_class.name.clone();
-        runtime.loaded_classes.insert(name.clone(), main_class);
+        runtime.loaded_classes.insert(name.clone(), Class::Java(main_class));
         runtime.main_class = runtime.loaded_classes
             .get_mut(&*name)
-            .unwrap() as *mut Class;
+            .unwrap() as *mut JavaClass;
 
         Ok(runtime)
     }
 
-    pub fn load(&mut self, name: String) -> Result<*mut Class, std::io::Error> {
+    // TODO: make strings
+    pub fn new_string(&mut self, _contents: &str) -> Value {
+        Value::nobject(null_mut())
+    }
+
+    pub fn load(&mut self, name: String) -> Result<*mut JavaClass, std::io::Error> {
         if let Some(cls) = self.loaded_classes.get_mut(&name) {
-            return Ok(cls as *mut Class);
+            return Ok(cls as *mut JavaClass);
         }
 
         println!("searching for {name}.class");
 
-        for (loaded, _) in &self.loaded_classes {
-            println!("{} is already loaded", loaded)
-        }
-
-        let cls = Class::from_classfile(
+        let cls = JavaClass::from_classfile(
             ClassReader::new(&(name.clone() + ".class"))?.read_classfile(),
             self
         );
 
-        self.loaded_classes.insert(name.to_string(), cls);
+        self.add_java_class(cls);
 
-        return Ok(self.loaded_classes.get_mut(&name).unwrap() as *mut Class);
+        return Ok(self.loaded_classes.get_mut(&name).unwrap() as *mut JavaClass);
     }
 
     pub fn run_main<'a>(self: &mut Self) {
-        let main_class: &'a Class = unsafe { &*self.main_class };
+        let main_class: &'a JavaClass = unsafe { &*self.main_class };
         let main_string_args: Result<&'a Method, ()> = main_class.get_method(
             "main".to_string(),
             "([Ljava/lang/String;)V".to_string()
@@ -98,5 +102,23 @@ impl Runtime {
             Type::Void => {},
             _ => panic!("unsupported return type!"),
         };
+    }
+
+    pub fn add_class(&mut self, cls: Class) {
+        self.loaded_classes.insert(cls.name.clone(), cls);
+    }
+
+    pub fn add_native_class(&mut self, cls: NativeClass) {
+        self.loaded_classes.insert(cls.name.clone(), Class::Native(cls));
+    }
+
+    pub fn add_java_class(&mut self, cls: JavaClass) {
+        self.loaded_classes.insert(cls.name.clone(), Class::Java(cls));
+    }
+
+    pub fn get_class(&mut self, name: &str) -> Result<*mut JavaClass, String> {
+        self.loaded_classes.get_mut(name)
+            .map(|x| x as *mut JavaClass)
+            .ok_or_else(|| name.to_string())
     }
 }

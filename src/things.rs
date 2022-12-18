@@ -1,4 +1,4 @@
-use crate::Class;
+use crate::JavaClass;
 
 use std::fmt::{Display, Debug, Formatter};
 
@@ -12,13 +12,13 @@ pub union Value {
     long: i64,
     float: f32,
     double: f64,
-    object: *mut Object,
+    pub(crate) object: *mut Object,
     array: *mut Array,
 }
 
 pub struct Object {
     // a pointer to the class the object is from
-    pub class: *const Class,
+    pub class: *const JavaClass,
     // we allocate the object with more size than this, because if we made
     // the size of the array variable it would make `Object` `!Sized`, making
     // its pointers 2* fatter and making everything take up twice the memory

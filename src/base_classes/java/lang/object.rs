@@ -1,9 +1,9 @@
 use std::ptr::null_mut;
-use crate::{Class, Runtime};
+use crate::{JavaClass, Runtime};
 
 pub fn object(runtime: &mut Runtime) {
     runtime.add_class(
-        Class {
+        JavaClass {
             name: "java/lang/Object".to_string(),
             constant_pool: vec![],
             access_flags: 0,

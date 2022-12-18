@@ -6,7 +6,7 @@ use crate::constant_pool::ConstantPoolInfo;
 use crate::method_info::MethodInfo;
 use crate::stack_frame::StackFrame;
 use crate::things::Value;
-use crate::{descriptor, Class, Runtime};
+use crate::{descriptor, JavaClass, Runtime};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use crate::descriptor::DescriptorInfo;
@@ -25,7 +25,7 @@ impl Method {
     pub fn exec(
         &self,
         runtime: &mut Runtime,
-        class: *mut Class,
+        class: *mut JavaClass,
         stack_frame: &mut StackFrame,
     ) -> Option<Value> {
         match self {
@@ -47,7 +47,7 @@ pub struct NativeMethod {
     pub access_flags: u16,
     pub descriptor: String,
     pub parsed_descriptor: DescriptorInfo,
-    pub func: Box<dyn Fn(&NativeMethod, &mut Runtime, *mut Class) -> Option<Value>>,
+    pub func: Box<dyn Fn(&NativeMethod, &mut Runtime, *mut JavaClass) -> Option<Value>>,
 }
 
 impl Debug for NativeMethod {
@@ -68,7 +68,7 @@ pub struct JavaMethod {
     pub name: String,
     pub access_flags: u16,
     pub descriptor: String,
-    pub parsed_descriptor: descriptor::DescriptorInfo,
+    pub parsed_descriptor: DescriptorInfo,
     pub attributes: HashMap<String, Vec<u8>>,
     pub code: Option<Code>,
 }
@@ -99,28 +99,58 @@ impl JavaMethod {
         m
     }
 
+    pub fn is_static(&self) -> bool {
+        self.access_flags | 8 != 0
+    }
+
     pub fn exec(
         &self,
         runtime: &mut Runtime,
-        class: *mut Class,
+        class: *mut JavaClass,
         stack_frame: &mut StackFrame,
     ) -> Option<Value> {
         println!("{}.{} called", unsafe { &*class }.name, self.name);
         let mut pc: usize = 0;
         let code = &self.code.clone().expect("called method with no code!");
-        let get_cpi = |x| unsafe { &*class }.constant_pool[x as usize - 1].clone();
+        let constant_pool = &unsafe { &*class }.constant_pool;
+        let get_cpi = |x| constant_pool[x as usize - 1].clone();
+
         loop {
             match code.code[pc] {
+                // loads an integer from the first operand and pushes it to the stack
                 Instruction::Iload0 => stack_frame
                     .operand_stack
                     .push(stack_frame.locals[0].clone()),
+
+                // constants
                 Instruction::Iconst0 => stack_frame.operand_stack.push(Value::ICONST_0),
                 Instruction::Iconst2 => stack_frame.operand_stack.push(Value::ICONST_2),
                 Instruction::Iconst5 => stack_frame.operand_stack.push(Value::ICONST_5),
+
+                // arithmetic
                 Instruction::Imul => {
                     let one = stack_frame.operand_stack.pop().unwrap().int();
                     let two = stack_frame.operand_stack.pop().unwrap().int();
                     stack_frame.operand_stack.push(Value::nint(one * two))
+                }
+
+                // gets a static field of a class
+                Instruction::Getstatic(n) => {
+                    let field = get_cpi(n).fieldref().unwrap();
+                    let cls_name = get_cpi(field.class_index).class_name(constant_pool);
+                    dbg!(&cls_name);
+                    let cls = runtime.load(cls_name).unwrap();
+
+                    let nt = get_cpi(field.name_and_type_index)
+                        .name_and_type().unwrap();
+
+                    let name_descriptor = (
+                        get_cpi(nt.name_index).utf8().unwrap(),
+                        get_cpi(nt.descriptor_index).utf8().unwrap(),
+                    );
+
+                    let val = unsafe { &*cls }.get_static(&name_descriptor).unwrap();
+                    stack_frame.operand_stack.push(val);
                 }
                 Instruction::Invokestatic(n) => {
                     let methodref = get_cpi(n).methodref().unwrap();
@@ -154,7 +184,7 @@ impl JavaMethod {
                 }
 
                 Instruction::Ireturn => return stack_frame.operand_stack.pop(),
-                x => panic!("unknown bytecode {:#?}", x),
+                x => panic!("unknown bytecode {:#?}, stackframe: {:?}", x, stack_frame),
             }
             pc += 1;
             if pc > code.code.len() {

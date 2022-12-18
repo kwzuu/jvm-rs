@@ -6,32 +6,44 @@ use crate::{ClassReader, Runtime};
 use std::collections::HashMap;
 use crate::things::Value;
 
+pub enum Class {
+    Java(JavaClass),
+    Native(NativeClass),
+}
+
+pub struct NativeClass {
+    pub name: String,
+    pub access_flags: u16,
+    pub super_class: *mut NativeClass,
+    pub interfaces: Vec<*mut NativeClass>,
+    pub static_fields: HashMap<(String, String), Field>,
+}
+
 #[derive(Debug)]
-pub struct Class {
+pub struct JavaClass {
     pub name: String,
     pub constant_pool: Vec<ConstantPoolInfo>,
     pub access_flags: u16,
     pub super_class: *mut Class,
     pub interfaces: Vec<*mut Class>, // sorted
-    pub static_fields: HashMap<String, Field>,
-    pub instance_fields: HashMap<String, Field>,
+    pub static_fields: HashMap<(String, String), Field>,
+    pub instance_fields: HashMap<(String, String), Field>,
     pub methods: HashMap<(String, String), Method>, // (Name, Descriptor)
     pub attributes: HashMap<String, Vec<u8>>,           // String is name, Vec is data
-    pub field_order: Vec<String>
 }
 
-impl<'a> Class {
-    pub fn from_filename(name: &str, runtime: &mut Runtime) -> Result<Class, std::io::Error> {
+impl<'a> JavaClass {
+    pub fn from_filename(name: &str, runtime: &mut Runtime) -> Result<JavaClass, std::io::Error> {
         return Ok(Self::from_classfile(
             ClassReader::new(name)?.read_classfile(),
             runtime
         ));
     }
 
-    pub fn from_classfile(mut c: ClassFile, runtime: &mut Runtime) -> Class {
+    pub fn from_classfile(mut c: ClassFile, runtime: &mut Runtime) -> JavaClass {
         let cp = &mut c.constant_pool;
 
-        let mut cls = Class {
+        let mut cls = JavaClass {
             access_flags: c.access_flags,
             name: cp[(c.this_class - 1) as usize].class_name(cp),
             super_class: runtime.load(cp[(c.super_class - 1) as usize].class_name(cp))
@@ -39,22 +51,21 @@ impl<'a> Class {
             interfaces: c
                 .interfaces
                 .iter()
-                .map(|x| &mut Class::from_filename(
+                .map(|x| &mut JavaClass::from_filename(
                     &*cp[(x - 1) as usize].class_name(cp),
                     runtime
-                ).unwrap() as *mut Class).collect(),
+                ).unwrap() as *mut JavaClass).collect(),
             static_fields: HashMap::new(),
             instance_fields: HashMap::new(),
             methods: HashMap::new(),
             attributes: HashMap::new(),
-            field_order: vec![],
             constant_pool: cp.clone(),
         };
 
         for fi in &c.fields {
             let f = Field::from_info(cp, fi);
             if f.is_static() {
-                cls.static_fields.insert(f.name.clone(), f);
+                cls.static_fields.insert((f.name.clone(), f.descriptor.clone()), f);
             } else {
                 cls.field_order.insert(
                     cls.field_order.binary_search(&f.name)
@@ -87,18 +98,15 @@ impl<'a> Class {
         return Err(());
     }
 
-    pub fn set_static(&mut self, name: &str, val: Value) -> Result<(), ()> {
-        Ok(self.static_fields.get_mut(name).ok_or(())?.set_static(val))
+    pub fn set_static(&mut self, field: &(String, String), val: Value) -> Result<(), ()> {
+        Ok(self.static_fields.get_mut(field).ok_or(())?.set_static(val))
     }
 
-    pub fn get_static(&self, name: &str) -> Option<Value> {
-        Some(self.static_fields.get(name)?.get_static())
+    pub fn get_static(&self, field: &(String, String)) -> Option<Value> {
+        Some(self.static_fields.get(field)?.get_static())
     }
 
-    pub fn get_field(&'a self, name: &str) -> Result<&'a Field, ()> {
-        match self.static_fields.get(name).or_else(|| self.instance_fields.get(name)) {
-            Some(f) => Ok(f),
-            _ => Err(()),
-        }
+    pub fn get_instance_field(&'a self, field: &(String, String)) -> Result<&'a Field, ()> {
+        self.instance_fields.get(field).ok_or(())
     }
 }

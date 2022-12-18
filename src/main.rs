@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 extern crate core;
 
-use crate::class::Class;
+use crate::class::JavaClass;
 use crate::class_reader::ClassReader;
 use crate::runtime::Runtime;
 

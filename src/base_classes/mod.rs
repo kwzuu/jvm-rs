@@ -1,22 +1,13 @@
-use std::ptr::null_mut;
+mod java;
 
-pub fn base_classes() -> Vec<Class> {
-    let mut classes = vec![];
+use crate::{JavaClass, Runtime};
 
-    let object = Class {
-        name: "java/lang/Object".to_string(),
-        constant_pool: vec![],
-        access_flags: 0,
-        super_class: null_mut(),
-        interfaces: vec![],
-        static_fields: Default::default(),
-        instance_fields: Default::default(),
-        methods: Default::default(),
-        attributes: Default::default(),
-        field_order: vec![]
-    };
-
-    classes.push(object);
-
-    classes
+pub fn base_classes(runtime: &mut Runtime) {
+    java::lang::object(runtime);
+    java::lang::appendable(runtime);
+    java::io::closeable(runtime);
+    java::io::outputstream(runtime);
+    java::io::filteroutputstream(runtime);
+    java::io::printstream(runtime);
+    java::lang::system(runtime);
 }

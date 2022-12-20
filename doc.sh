@@ -1,2 +1,2 @@
 #!/bin/bash
-rustdoc $(find . -name '*.rs') -o ./doc
+rustdoc src/main.rs -o ./doc

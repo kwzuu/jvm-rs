@@ -47,7 +47,7 @@ pub fn object(runtime: &mut Runtime) {
                     access_flags: 0,
                     descriptor: "(Ljava/lang/Object;)Z".to_string(),
                     parsed_descriptor: DescriptorInfo {
-                        ret: Type::,
+                        ret: Type::Void,
                         args: vec![Type::Object(Box::from("java/lang/Object".to_string()))],
                     },
                     func: Box::new(|meth, runtime, jclass| {

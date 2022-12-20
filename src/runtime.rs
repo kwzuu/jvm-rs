@@ -118,7 +118,8 @@ impl Runtime {
     }
 
     pub fn add_class(&mut self, cls: Class) {
-        self.loaded_classes.insert(cls.name().to_string(), cls);
+        let name = cls.name().clone().to_string();
+        self.class_merge_in(cls, name);
     }
 
     pub fn add_native_class(&mut self, cls: NativeClass) {
@@ -132,49 +133,24 @@ impl Runtime {
     fn class_merge_in(&mut self, cls: Class, name: String) {
         // Generating JavaClass for this because it has more fields :)
 
-        if let Some(first) = self.loaded_classes.get(&name) {
-            let name = name.clone();
-            let constant_pool: Vec<ConstantPoolInfo> = vec![];
-            let access_flags: u16 = 0;
-            let super_class: *mut Class = null_mut();
-            let interfaces: Vec<*mut Class> = vec![];
-            let static_fields: HashMap<String, Field> = HashMap::new();
-            let instance_fields: HashMap<String, Field> = HashMap::new();
-            let methods: HashMap<(String, String), Method> = HashMap::new();
-            let attributes: HashMap<String, Vec<u8>> = HashMap::new();
-
-            let second = cls;
-
-            if first.access_flags() != second.access_flags() {
-                dbg!(first);
-                dbg!(second);
-                eprintln!("WARNING: Discarding initial access_flag of first and giving priority to second")
+        if let Some(first) = self.loaded_classes.get_mut(&name) {
+            let mut second = cls;
+            if let Class::Java(_) = first && let Class::Java(_) = second {
+                panic!("merging JavaClass with JavaClass not yet supported (ERR in loading class {name})");
             }
-            access_flags = second.access_flags();
-            if first.super_class() != second.super_class() {
-                panic!("FATAL: Cannot merge similar classes if superclasses are not equal")
+            match (&first, &second) {
+                (Class::Java(_), Class::Native(_)) |
+                (Class::Native(_), Class::Native(_)) => {
+                    first.merge_methods(&mut second);
+                    return;
+                },
+                (Class::Native(_), Class::Java(_)) => {
+                    second.merge_methods(first);
+                    self.loaded_classes.insert(name, second);
+                    return;
+                },
+                _ => panic!("merging JavaClass with JavaClass not yet supported (ERR in loading class {name})"),
             }
-            super_class = second.super_class();
-            
-
-
-            match first {
-                Class::Java(cls) => {
-
-                }
-                _ => {}
-            }
-            match second {
-                Class::Java(cls) => {
-                    if !constant_pool.is_empty() && !cls.constant_pool.is_empty() {
-                        dbg!(first);
-                        dbg!(second);
-                        panic!("FATAL: Cannot merge constant pools!")
-                    }
-                }
-                _ => {}
-            }
-
         } else {
             self.loaded_classes.insert(name, cls);
         }

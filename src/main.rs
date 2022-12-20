@@ -1,27 +1,29 @@
 #![feature(pointer_byte_offsets)]
 #![feature(fn_traits)]
+#![feature(let_chains)]
 #![allow(dead_code)]
+
 extern crate core;
 
 use crate::class::JavaClass;
 use crate::class_reader::ClassReader;
 use crate::runtime::Runtime;
 
-mod attributes;
-mod bytecode;
-mod class;
-mod class_file;
-mod class_reader;
-mod constant_pool;
-mod descriptor;
-mod field_info;
-mod method;
-mod method_info;
-mod runtime;
-mod stack_frame;
-mod things;
-mod heap;
-mod base_classes;
+pub mod attributes;
+pub mod bytecode;
+pub mod class;
+pub mod class_file;
+pub mod class_reader;
+pub mod constant_pool;
+pub mod descriptor;
+pub mod field_info;
+pub mod method;
+pub mod method_info;
+pub mod runtime;
+pub mod stack_frame;
+pub mod things;
+pub mod heap;
+pub mod base_classes;
 
 fn main() -> Result<(), std::io::Error> {
     let args: Vec<String> = std::env::args().collect();

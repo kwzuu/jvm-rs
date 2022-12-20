@@ -3,23 +3,39 @@ use std::slice::Iter;
 
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+/// JVM SE7 Bytecode Instructions
 pub enum Instruction {
-    
+    /// Do nothing, I suppose.
     Nop,
+    /// Load `null` onto the operand stack
     AconstNull,
+    /// Load `-1 as i32` onto the operand stack
     IconstM1,
+    /// Load `0 as i32` onto the operand stack
     Iconst0,
+    /// Load `1 as i32` onto the operand stack
     Iconst1,
+    /// Load `2 as i32` onto the operand stack
     Iconst2,
+    /// Load `3 as i32` onto the operand stack
     Iconst3,
+    /// Load `4 as i32` onto the operand stack
     Iconst4,
+    /// Load `5 as i32` onto the operand stack
     Iconst5,
+    /// Load `0 as i64` onto the operand stack
     Lconst0,
+    /// Load `1 as i64` onto the operand stack
     Lconst1,
+    /// Load `0 as f32` onto the operand stack
     Fconst0,
+    /// Load `1 as f32` onto the operand stack
     Fconst1,
+    /// Load `2 as f32` onto the operand stack
     Fconst2,
+    /// Load `0 as f64` onto the operand stack
     Dconst0,
+    /// Load `1 as f64` onto the operand stack
     Dconst1,
     Bipush(u8),
     Sipush(u16),
@@ -55,6 +71,9 @@ pub enum Instruction {
     Laload,
     Faload,
     Daload,
+    /// Find item at index of array by popping arrayref
+    /// and index from the operand stack, and then push it
+    /// to the operand stack.
     Aaload,
     Baload,
     Caload,
@@ -88,6 +107,7 @@ pub enum Instruction {
     Lastore,
     Fastore,
     Dastore,
+    
     Aastore,
     Bastore,
     Castore,

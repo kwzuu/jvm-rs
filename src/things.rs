@@ -2,8 +2,13 @@
 
 use std::fmt::{Display, Debug, Formatter};
 use crate::class::Class;
+use std::ptr::null_mut;
+use crate::constant_pool::ConstantPoolInfo;
 
-
+#[derive(Copy, Clone)]
+pub(crate) enum SpecialVal {
+    Null,
+}
 #[derive(Copy, Clone)]
 pub union Value {
     byte: i8,
@@ -15,6 +20,8 @@ pub union Value {
     double: f64,
     pub(crate) object: *mut Object,
     array: *mut Array,
+    boolean: bool,
+    pub(crate) special: SpecialVal,
 }
 
 pub struct Object {
@@ -67,6 +74,12 @@ impl Value {
 
     pub const LCONST_0: Self = Value { long: 0 };
     pub const LCONST_1: Self = Value { long: 1 };
+    
+    pub const NULL: Self = Value { special: SpecialVal::Null };
+    
+    pub const TRUE: Self = Value { boolean: true };
+    pub const FALSE: Self = Value { boolean: false };
+    
 
     pub fn nbyte(n: i8) -> Self { Self { byte: n } }
     pub fn nchar(n: u16) -> Self { Self { char: n } }
@@ -91,6 +104,21 @@ impl Value {
 
     pub fn array(self) -> *mut Array { unsafe { self.array } }
     pub fn object(self) -> *mut Object { unsafe { self.object } }
+    pub fn boolean(self) -> bool { unsafe { self.boolean } }
+
+    pub fn is_null(self) -> bool {
+        match self {
+            Value { special: SpecialVal::Null } => true,
+            _ => false,
+        }
+    }
+    pub fn is_nullptr(self) -> bool {
+        if unsafe {self.object.is_null()} {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl Display for Value {
@@ -103,4 +131,10 @@ impl Debug for Value {
   fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
     f.write_str(&*format!("{:016x}", unsafe { self.long }))
   }
+}
+
+impl From<ConstantPoolInfo> for Value {
+    fn from(value: ConstantPoolInfo) -> Self {
+        todo!()
+    }
 }

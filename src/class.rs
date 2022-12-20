@@ -6,7 +6,7 @@ use crate::method::{JavaMethod, Method};
 use crate::{ClassReader, Runtime};
 use std::collections::HashMap;
 use crate::class::Class::{Java, Native};
-use crate::things::Value;
+use crate::things::{Object, Value};
 
 pub(crate) mod access_flags {
     pub const PUBLIC: u16 = 0x0001;
@@ -118,6 +118,42 @@ impl Class {
             Native(c) => &c.static_fields,
         }.get(name).map(Field::get_static)
     }
+
+    pub fn set_static(&mut self, name: &str, value: Value) {
+        match self {
+            Java(c) => c.static_fields.get_mut(name).unwrap().set_static(value),
+            Native(c) => c.static_fields.get_mut(name).unwrap().set_static(value),
+        }
+    }
+    // instance fields
+    pub fn get_instance_field(&self, object: &mut Object, name: &str) -> Value {
+        match self {
+            Java(c) => c.instance_fields.get(name).unwrap().get_instance(object),
+            Native(c) => c.instance_fields.get(name).unwrap().get_instance(object),
+        }
+    }
+    pub fn set_instance_field(&mut self, object: &mut Object, name: &str, value: Value) {
+        match self {
+            Java(c) => c.instance_fields.get_mut(name).unwrap().set_instance(object, value),
+            Native(c) => c.instance_fields.get_mut(name).unwrap().set_instance(object, value),
+        }
+    }
+    pub fn merge_methods(&mut self, other: &mut Class) {
+        match (self, other) {
+            (Native(c), Native(o)) => {
+                for (k, v) in o.methods.drain() {
+                    c.methods.insert(k, v);
+                }
+            }
+            (Java(c), Native(o)) => {
+                for (k, v) in o.methods.drain() {
+                    c.methods.insert(k, v);
+                }
+            }
+            _ => panic!("Cannot merge classes where other is Java because that would discard all non-method attributes of the java class.")
+        }
+    }
+
 }
 #[derive(Debug)]
 pub struct NativeClass {

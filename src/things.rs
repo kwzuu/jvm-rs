@@ -2,13 +2,10 @@
 
 use std::fmt::{Display, Debug, Formatter};
 use crate::class::Class;
-use std::ptr::null_mut;
+
 use crate::constant_pool::ConstantPoolInfo;
 
-#[derive(Copy, Clone)]
-pub(crate) enum SpecialVal {
-    Null,
-}
+
 #[derive(Copy, Clone)]
 pub union Value {
     byte: i8,
@@ -21,7 +18,6 @@ pub union Value {
     pub(crate) object: *mut Object,
     array: *mut Array,
     boolean: bool,
-    pub(crate) special: SpecialVal,
 }
 
 pub struct Object {
@@ -74,9 +70,7 @@ impl Value {
 
     pub const LCONST_0: Self = Value { long: 0 };
     pub const LCONST_1: Self = Value { long: 1 };
-    
-    pub const NULL: Self = Value { special: SpecialVal::Null };
-    
+
     pub const TRUE: Self = Value { boolean: true };
     pub const FALSE: Self = Value { boolean: false };
     
@@ -106,11 +100,10 @@ impl Value {
     pub fn object(self) -> *mut Object { unsafe { self.object } }
     pub fn boolean(self) -> bool { unsafe { self.boolean } }
 
-    pub fn is_null(self) -> bool {
-        match self {
-            Value { special: SpecialVal::Null } => true,
-            _ => false,
-        }
+    pub const NULL: Value = Value { object: std::ptr::null_mut() };
+
+    pub fn is_null(&self) -> bool {
+        self == &Self::NULL
     }
     pub fn is_nullptr(self) -> bool {
         if unsafe {self.object.is_null()} {
@@ -134,7 +127,12 @@ impl Debug for Value {
 }
 
 impl From<ConstantPoolInfo> for Value {
-    fn from(value: ConstantPoolInfo) -> Self {
+    fn from(_value: ConstantPoolInfo) -> Self {
         todo!()
+    }
+}
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        unsafe { self.long == other.long }
     }
 }

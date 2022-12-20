@@ -6,11 +6,11 @@ use crate::bytecode::Instruction;
 use crate::constant_pool::ConstantPoolInfo;
 use crate::method_info::MethodInfo;
 use crate::stack_frame::StackFrame;
-use crate::things::{Object, Value};
+use crate::things::{Value};
 use crate::{descriptor, JavaClass, Runtime};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use crate::class::Class;
+
 use crate::descriptor::DescriptorInfo;
 
 #[derive(Debug)]
@@ -800,13 +800,13 @@ impl JavaMethod {
                         stack_frame.operand_stack.push(x)
                     }
                 },
-                Instruction::New(n) => {
+                Instruction::New(_n) => {
                     todo!()
                 },
-                Instruction::Newarray(n) => {
+                Instruction::Newarray(_n) => {
                     todo!()
                 },
-                Instruction::Anewarray(n) => {
+                Instruction::Anewarray(_n) => {
                     todo!()
                 },
                 Instruction::Arraylength => {
@@ -815,10 +815,10 @@ impl JavaMethod {
                 Instruction::Athrow => {
                     todo!()
                 },
-                Instruction::Checkcast(n) => {
+                Instruction::Checkcast(_n) => {
                     todo!()
                 },
-                Instruction::Instanceof(n) => {
+                Instruction::Instanceof(_n) => {
                     todo!()
                 },
                 Instruction::Monitorenter => {
@@ -827,22 +827,22 @@ impl JavaMethod {
                 Instruction::Monitorexit => {
                     todo!()
                 },
-                Instruction::Wide3(n, m) => {
+                Instruction::Wide3(_n, _m) => {
                     todo!()
                 },
-                Instruction::Wide5(n, m, o) => {
+                Instruction::Wide5(_n, _m, _o) => {
                     todo!()
                 },
-                Instruction::Multianewarray(n, m) => {
+                Instruction::Multianewarray(_n, _m) => {
                     todo!()
                 },
-                Instruction::Ifnull(n) => {
+                Instruction::Ifnull(_n) => {
                     todo!()
                 },
-                Instruction::Ifnonnull(n) => {
+                Instruction::Ifnonnull(_n) => {
                     todo!()
                 },
-                Instruction::GotoW(n) => {
+                Instruction::GotoW(_n) => {
                     todo!()
                 },
                 Instruction::Breakpoint => {
@@ -854,17 +854,6 @@ impl JavaMethod {
                     // hold for user input
                     let mut input = String::new();
                     std::io::stdin().read_line(&mut input).unwrap();
-                    type pid_t = i32;
-
-                    #[link(name = "c")]
-                    extern "C" {
-                        fn kill(pid: pid_t, sig: i32) -> i32;
-
-                    }
-                    // kill parent
-                    unsafe {
-                        kill(0, 9);
-                    }
 
                 },
                 Instruction::Impdep1 => {

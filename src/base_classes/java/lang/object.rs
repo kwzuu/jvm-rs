@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::ptr::{hash, null_mut};
+use std::ptr::{null_mut};
 use crate::{Runtime};
 use crate::class::{NativeClass, access_flags::*};
 use crate::descriptor::{DescriptorInfo, Type};
@@ -16,18 +16,7 @@ pub fn object(runtime: &mut Runtime) {
             static_fields: Default::default(),
             instance_fields: Default::default(),
             methods: {
-                let object_get_class = Native(NativeMethod {
-                    name: "getClass".to_string(),
-                    access_flags: 0,
-                    descriptor: "()Ljava/lang/Class;".to_string(),
-                    parsed_descriptor: DescriptorInfo {
-                        ret: Type::Object(Box::from("java/lang/Class".to_string())),
-                        args: vec![],
-                    },
-                    func: Box::new(|meth, runtime, jclass| {
-                        panic!("not implemented [!TYPEPARAMS]");
-                    }),
-                });
+
                 let object_hash_code = Native(NativeMethod {
                     name: "hashCode".to_string(),
                     access_flags: 0,
@@ -36,28 +25,30 @@ pub fn object(runtime: &mut Runtime) {
                         ret: Type::Int,
                         args: vec![],
                     },
-                    func: Box::new(|meth, runtime, jclass| {
+                    func: Box::new(|_meth, _runtime, _jclass| {
                         println!("hashCode not implemented, returning default value of 0");
                         Some(Value::nint(0))
 
                     }),
                 });
+                // equals
                 let object_equals = Native(NativeMethod {
                     name: "equals".to_string(),
                     access_flags: 0,
                     descriptor: "(Ljava/lang/Object;)Z".to_string(),
                     parsed_descriptor: DescriptorInfo {
-                        ret: Type::Void,
+                        ret: Type::Bool,
                         args: vec![Type::Object(Box::from("java/lang/Object".to_string()))],
                     },
-                    func: Box::new(|meth, runtime, jclass| {
-                        panic!("not implemented [!TYPEPARAMS]");
+                    func: Box::new(|_method, _runtime, _class| {
+
+                        Some(Value::FALSE)
                     }),
                 });
                 let mut m: HashMap<(String, String), Method> = HashMap::new();
 
-                m.insert(("getClass".to_string(), "()Ljava/lang/Class;".to_string()), object_get_class);
                 m.insert(("hashCode".to_string(), "()I".to_string()), object_hash_code);
+                m.insert(("equals".to_string(), "(Ljava/lang/Object;)Z".to_string()), object_equals);
                 m
             },
         }

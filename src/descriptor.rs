@@ -12,6 +12,7 @@ pub enum Type {
     Double,
     Object(Box<String>),
     Array(u8, Box<Type>),
+    Bool
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

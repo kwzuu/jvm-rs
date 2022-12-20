@@ -52,6 +52,7 @@ pub fn types_from(arg_str: &str) -> Vec<Type> {
                     index += 1;
                     Object(Box::from(s))
                 },
+                
                 c => panic!("invalid char {}", c),
             },
         ))

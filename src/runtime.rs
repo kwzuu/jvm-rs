@@ -1,3 +1,5 @@
+use crate::constant_pool::ConstantPoolInfo;
+use crate::field_info::Field;
 use crate::method::{Method};
 use crate::stack_frame::StackFrame;
 use crate::{JavaClass, ClassReader};
@@ -126,6 +128,59 @@ impl Runtime {
     pub fn add_java_class(&mut self, cls: JavaClass) {
         self.loaded_classes.insert(cls.name.clone(), Class::Java(cls));
     }
+
+    fn class_merge_in(&mut self, cls: Class, name: String) {
+        // Generating JavaClass for this because it has more fields :)
+
+        if let Some(first) = self.loaded_classes.get(&name) {
+            let name = name.clone();
+            let constant_pool: Vec<ConstantPoolInfo> = vec![];
+            let access_flags: u16 = 0;
+            let super_class: *mut Class = null_mut();
+            let interfaces: Vec<*mut Class> = vec![];
+            let static_fields: HashMap<String, Field> = HashMap::new();
+            let instance_fields: HashMap<String, Field> = HashMap::new();
+            let methods: HashMap<(String, String), Method> = HashMap::new();
+            let attributes: HashMap<String, Vec<u8>> = HashMap::new();
+
+            let second = cls;
+
+            if first.access_flags() != second.access_flags() {
+                dbg!(first);
+                dbg!(second);
+                eprintln!("WARNING: Discarding initial access_flag of first and giving priority to second")
+            }
+            access_flags = second.access_flags();
+            if first.super_class() != second.super_class() {
+                panic!("FATAL: Cannot merge similar classes if superclasses are not equal")
+            }
+            super_class = second.super_class();
+            
+
+
+            match first {
+                Class::Java(cls) => {
+
+                }
+                _ => {}
+            }
+            match second {
+                Class::Java(cls) => {
+                    if !constant_pool.is_empty() && !cls.constant_pool.is_empty() {
+                        dbg!(first);
+                        dbg!(second);
+                        panic!("FATAL: Cannot merge constant pools!")
+                    }
+                }
+                _ => {}
+            }
+
+        } else {
+            self.loaded_classes.insert(name, cls);
+        }
+    }
+
+
 
     pub fn get_class(&mut self, name: &str) -> Result<*mut Class, String> {
         self.loaded_classes.get_mut(name)

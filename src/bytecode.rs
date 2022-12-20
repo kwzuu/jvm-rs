@@ -4,6 +4,7 @@ use std::slice::Iter;
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Instruction {
+    
     Nop,
     AconstNull,
     IconstM1,

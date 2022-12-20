@@ -120,15 +120,31 @@ impl JavaMethod {
 
         loop {
             match code.code[pc] {
+                Instruction::Nop => {},
                 // loads an integer from the first operand and pushes it to the stack
                 Instruction::Iload0 => stack_frame
                     .operand_stack
                     .push(stack_frame.locals[0].clone()),
 
                 // constants
+
+                Instruction::IconstM1 => stack_frame.operand_stack.push(Value::ICONST_M1),
                 Instruction::Iconst0 => stack_frame.operand_stack.push(Value::ICONST_0),
+                Instruction::Iconst1 => stack_frame.operand_stack.push(Value::ICONST_1),
                 Instruction::Iconst2 => stack_frame.operand_stack.push(Value::ICONST_2),
+                Instruction::Iconst3 => stack_frame.operand_stack.push(Value::ICONST_3),
+                Instruction::Iconst4 => stack_frame.operand_stack.push(Value::ICONST_4),
                 Instruction::Iconst5 => stack_frame.operand_stack.push(Value::ICONST_5),
+                Instruction::Lconst0 => stack_frame.operand_stack.push(Value::LCONST_0),
+                Instruction::Lconst1 => stack_frame.operand_stack.push(Value::LCONST_1),
+                Instruction::Lconst1 => stack_frame.operand_stack.push(Value::LCONST_1),
+                Instruction::Fconst0 => stack_frame.operand_stack.push(Value::FCONST_0),
+                Instruction::Fconst1 => stack_frame.operand_stack.push(Value::FCONST_1),
+                Instruction::Fconst2 => stack_frame.operand_stack.push(Value::FCONST_2),
+                Instruction::Dconst0 => stack_frame.operand_stack.push(Value::DCONST_0),
+                Instruction::Dconst1 => stack_frame.operand_stack.push(Value::DCONST_1),
+
+
 
                 // arithmetic
                 Instruction::Imul => {

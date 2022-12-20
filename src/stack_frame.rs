@@ -7,8 +7,8 @@ struct Stack {
 
 #[derive(Debug)]
 pub struct StackFrame {
-    pub locals: Vec<Value>,
-    pub operand_stack: Vec<Value>,
+    locals: Vec<Value>,
+    operand_stack: Vec<Value>,
 }
 
 impl StackFrame {
@@ -34,5 +34,31 @@ impl StackFrame {
             }
         }
 
+    }
+
+    pub fn push(&mut self, val: Value) {
+        self.operand_stack.push(val);
+    }
+
+    pub fn pop(&mut self) -> Option<Value> {
+        self.operand_stack.pop()
+    }
+
+    pub fn peek(&self) -> Option<Value> {
+        self.operand_stack.last().map(Value::clone)
+    }
+
+    pub fn peek_n(&self, n: usize) -> Option<Value> {
+        self.operand_stack.get(
+            self.operand_stack.len() - n
+        ).map(Value::clone)
+    }
+
+    pub fn get(&self, n: usize) -> Value {
+        unsafe { self.locals.get_unchecked(n).clone() }
+    }
+
+    pub fn set(&mut self, n: usize, val: Value) {
+        unsafe { self.locals.insert(n, val) }
     }
 }

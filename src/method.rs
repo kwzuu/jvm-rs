@@ -122,19 +122,18 @@ impl JavaMethod {
             match code.code[pc] {
                 // loads an integer from the first operand and pushes it to the stack
                 Instruction::Iload0 => stack_frame
-                    .operand_stack
-                    .push(stack_frame.locals[0].clone()),
+                    .push(stack_frame.get(0).clone()),
 
                 // constants
-                Instruction::Iconst0 => stack_frame.operand_stack.push(Value::ICONST_0),
-                Instruction::Iconst2 => stack_frame.operand_stack.push(Value::ICONST_2),
-                Instruction::Iconst5 => stack_frame.operand_stack.push(Value::ICONST_5),
+                Instruction::Iconst0 => stack_frame.push(Value::ICONST_0),
+                Instruction::Iconst2 => stack_frame.push(Value::ICONST_2),
+                Instruction::Iconst5 => stack_frame.push(Value::ICONST_5),
 
                 // arithmetic
                 Instruction::Imul => {
-                    let one = stack_frame.operand_stack.pop().unwrap().int();
-                    let two = stack_frame.operand_stack.pop().unwrap().int();
-                    stack_frame.operand_stack.push(Value::nint(one * two))
+                    let one = stack_frame.pop().unwrap().int();
+                    let two = stack_frame.pop().unwrap().int();
+                    stack_frame.push(Value::nint(one * two))
                 }
 
                 // gets a static field of a class
@@ -150,7 +149,7 @@ impl JavaMethod {
                     let name = get_cpi(nt.name_index).utf8().unwrap();
 
                     let val = unsafe { &*cls }.get_static(&name).unwrap();
-                    stack_frame.operand_stack.push(val);
+                    stack_frame.push(val);
                 }
                 Instruction::Invokestatic(n) => {
                     let methodref = get_cpi(n).methodref().unwrap();
@@ -173,17 +172,15 @@ impl JavaMethod {
                     let argc = descriptor::info(&*descriptor).args.len();
 
                     for _ in 0..argc {
-                        new_frame
-                            .locals
-                            .push(stack_frame.operand_stack.pop().unwrap())
+                        new_frame.push(stack_frame.pop().unwrap())
                     }
 
                     if let Some(x) = called.exec(runtime, class.clone(), &mut new_frame) {
-                        stack_frame.operand_stack.push(x)
+                        stack_frame.push(x)
                     }
                 }
 
-                Instruction::Ireturn => return stack_frame.operand_stack.pop(),
+                Instruction::Ireturn => return stack_frame.pop(),
                 x => panic!("unknown bytecode {:#?}, stackframe: {:?}", x, stack_frame),
             }
             pc += 1;

@@ -100,9 +100,6 @@ impl Runtime {
 
         // frame will later(tm) contain the String[] for the `String[] args`
         let mut frame = StackFrame::new_for(main_method);
-        if frame.locals.capacity() > 0 {
-            panic!("static void main(String[]) entry point not yet supported")
-        }
 
         let result = main_method.exec(
             self,

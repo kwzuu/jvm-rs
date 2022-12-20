@@ -1,3 +1,5 @@
+
+
 use crate::method::{Method};
 use crate::stack_frame::StackFrame;
 use crate::{JavaClass, ClassReader};
@@ -116,7 +118,8 @@ impl Runtime {
     }
 
     pub fn add_class(&mut self, cls: Class) {
-        self.loaded_classes.insert(cls.name().to_string(), cls);
+        let name = cls.name().clone().to_string();
+        self.class_merge_in(cls, name);
     }
 
     pub fn add_native_class(&mut self, cls: NativeClass) {
@@ -126,6 +129,34 @@ impl Runtime {
     pub fn add_java_class(&mut self, cls: JavaClass) {
         self.loaded_classes.insert(cls.name.clone(), Class::Java(cls));
     }
+
+    fn class_merge_in(&mut self, cls: Class, name: String) {
+        // Generating JavaClass for this because it has more fields :)
+
+        if let Some(first) = self.loaded_classes.get_mut(&name) {
+            let mut second = cls;
+            if let Class::Java(_) = first && let Class::Java(_) = second {
+                panic!("merging JavaClass with JavaClass not yet supported (ERR in loading class {name})");
+            }
+            match (&first, &second) {
+                (Class::Java(_), Class::Native(_)) |
+                (Class::Native(_), Class::Native(_)) => {
+                    first.merge_methods(&mut second);
+                    return;
+                },
+                (Class::Native(_), Class::Java(_)) => {
+                    second.merge_methods(first);
+                    self.loaded_classes.insert(name, second);
+                    return;
+                },
+                _ => panic!("merging JavaClass with JavaClass not yet supported (ERR in loading class {name})"),
+            }
+        } else {
+            self.loaded_classes.insert(name, cls);
+        }
+    }
+
+
 
     pub fn get_class(&mut self, name: &str) -> Result<*mut Class, String> {
         self.loaded_classes.get_mut(name)

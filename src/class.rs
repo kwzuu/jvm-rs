@@ -6,7 +6,7 @@ use crate::method::{JavaMethod, Method};
 use crate::{ClassReader, Runtime};
 use std::collections::HashMap;
 use crate::class::Class::{Java, Native};
-use crate::things::Value;
+use crate::things::{Object, Value};
 
 pub(crate) mod access_flags {
     pub const PUBLIC: u16 = 0x0001;
@@ -18,7 +18,7 @@ pub(crate) mod access_flags {
     pub const ANNOTATION: u16 = 0x2000;
     pub const ENUM: u16 = 0x4000;
 }
-
+#[derive(Debug)]
 pub enum Class {
     Java(JavaClass),
     Native(NativeClass),
@@ -52,6 +52,31 @@ impl Class {
             Native(c) => &*c.name,
         }
     }
+    pub fn static_fields(&self) -> &HashMap<String, Field> {
+        match self {
+            Java(c) => &c.static_fields,
+            Native(c) => &c.static_fields,
+        }
+    }
+    pub fn instance_fields_raw(&self) -> &HashMap<String, Field> {
+        match self {
+            Java(c) => &c.instance_fields,
+            Native(c) => &c.instance_fields,
+        }
+    }
+    pub fn methods(&self) -> &HashMap<(String, String), Method> {
+        match self {
+            Java(c) => &c.methods,
+            Native(c) => &c.methods,
+        }
+    }
+
+    pub fn access_flags(&self) -> u16 {
+        match self {
+            Java(c) => c.access_flags,
+            Native(c) => c.access_flags,
+        }
+    }
 
     pub fn java(&self) -> Option<*const JavaClass> {
         match self {
@@ -64,6 +89,19 @@ impl Class {
         match self {
             Java(c) => Some(c as *mut JavaClass),
             Native(_) => None
+        }
+    }
+
+    pub fn native(&mut self) -> Option<*const NativeClass> {
+        match self {
+            Java(_) => None,
+            Native(c) => Some(c as *const NativeClass)
+        }
+    }
+    pub fn native_mut(&mut self) -> Option<*mut NativeClass> {
+        match self {
+            Java(_) => None,
+            Native(c) => Some(c as *mut NativeClass)
         }
     }
 
@@ -80,8 +118,44 @@ impl Class {
             Native(c) => &c.static_fields,
         }.get(name).map(Field::get_static)
     }
-}
 
+    pub fn set_static(&mut self, name: &str, value: Value) {
+        match self {
+            Java(c) => c.static_fields.get_mut(name).unwrap().set_static(value),
+            Native(c) => c.static_fields.get_mut(name).unwrap().set_static(value),
+        }
+    }
+    // instance fields
+    pub fn get_instance_field(&self, object: &mut Object, name: &str) -> Value {
+        match self {
+            Java(c) => c.instance_fields.get(name).unwrap().get_instance(object),
+            Native(c) => c.instance_fields.get(name).unwrap().get_instance(object),
+        }
+    }
+    pub fn set_instance_field(&mut self, object: &mut Object, name: &str, value: Value) {
+        match self {
+            Java(c) => c.instance_fields.get_mut(name).unwrap().set_instance(object, value),
+            Native(c) => c.instance_fields.get_mut(name).unwrap().set_instance(object, value),
+        }
+    }
+    pub fn merge_methods(&mut self, other: &mut Class) {
+        match (self, other) {
+            (Native(c), Native(o)) => {
+                for (k, v) in o.methods.drain() {
+                    c.methods.insert(k, v);
+                }
+            }
+            (Java(c), Native(o)) => {
+                for (k, v) in o.methods.drain() {
+                    c.methods.insert(k, v);
+                }
+            }
+            _ => panic!("Cannot merge classes where other is Java because that would discard all non-method attributes of the java class.")
+        }
+    }
+
+}
+#[derive(Debug)]
 pub struct NativeClass {
     pub name: String,
     pub access_flags: u16,

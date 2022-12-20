@@ -1,4 +1,4 @@
-use representations::*;
+use self::representations::*;
 
 #[derive(Debug, Clone)]
 pub enum ConstantPoolInfo {
@@ -172,7 +172,7 @@ impl ConstantPoolInfo {
     }
 
     pub fn tag(self) -> u8 {
-        use ConstantPoolInfo::*;
+        use self::ConstantPoolInfo::*;
 
         match self {
             Class(_) => 7,

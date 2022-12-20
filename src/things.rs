@@ -3,6 +3,8 @@
 use std::fmt::{Display, Debug, Formatter};
 use crate::class::Class;
 
+use crate::constant_pool::ConstantPoolInfo;
+
 
 #[derive(Copy, Clone)]
 pub union Value {
@@ -15,6 +17,7 @@ pub union Value {
     double: f64,
     pub(crate) object: *mut Object,
     array: *mut Array,
+    boolean: bool,
 }
 
 pub struct Object {
@@ -68,6 +71,10 @@ impl Value {
     pub const LCONST_0: Self = Value { long: 0 };
     pub const LCONST_1: Self = Value { long: 1 };
 
+    pub const TRUE: Self = Value { boolean: true };
+    pub const FALSE: Self = Value { boolean: false };
+    
+
     pub fn nbyte(n: i8) -> Self { Self { byte: n } }
     pub fn nchar(n: u16) -> Self { Self { char: n } }
     pub fn nshort(n: i16) -> Self { Self { short: n } }
@@ -91,6 +98,20 @@ impl Value {
 
     pub fn array(self) -> *mut Array { unsafe { self.array } }
     pub fn object(self) -> *mut Object { unsafe { self.object } }
+    pub fn boolean(self) -> bool { unsafe { self.boolean } }
+
+    pub const NULL: Value = Value { object: std::ptr::null_mut() };
+
+    pub fn is_null(&self) -> bool {
+        self == &Self::NULL
+    }
+    pub fn is_nullptr(self) -> bool {
+        if unsafe {self.object.is_null()} {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl Display for Value {
@@ -103,4 +124,15 @@ impl Debug for Value {
   fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
     f.write_str(&*format!("{:016x}", unsafe { self.long }))
   }
+}
+
+impl From<ConstantPoolInfo> for Value {
+    fn from(_value: ConstantPoolInfo) -> Self {
+        todo!()
+    }
+}
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        unsafe { self.long == other.long }
+    }
 }

@@ -1,0 +1,24 @@
+[-]
+
+pub struct NativeClass {
+<!--     pub name: String, -->
+    pub access_flags: u16,
+<!--     pub super_class: *mut Class, -->
+<!--     pub interfaces: Vec<*mut Class>, -->
+    pub static_fields: HashMap<String, Field>,
+    pub instance_fields: HashMap<String, Field>,
+    pub methods: HashMap<(String, String), Method>,
+}
+
+#[derive(Debug)]
+pub struct JavaClass {
+<!--     pub name: String, -->
+    pub constant_pool: Vec<ConstantPoolInfo>,
+        pub access_flags: u16,
+<!--         pub super_class: *mut Class, -->
+<!--         pub interfaces: Vec<*mut Class>, // sorted -->
+        pub static_fields: HashMap<String, Field>,
+        pub instance_fields: HashMap<String, Field>,
+        pub methods: HashMap<(String, String), Method>, // (Name, Descriptor)
+        pub attributes: HashMap<String, Vec<u8>>,           // String is name, Vec is data
+        }

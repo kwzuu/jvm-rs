@@ -12,6 +12,7 @@ pub enum Type {
     Double,
     Object(Box<String>),
     Array(u8, Box<Type>),
+    Bool
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -52,6 +53,7 @@ pub fn types_from(arg_str: &str) -> Vec<Type> {
                     index += 1;
                     Object(Box::from(s))
                 },
+
                 c => panic!("invalid char {}", c),
             },
         ))

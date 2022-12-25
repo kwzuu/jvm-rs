@@ -132,7 +132,7 @@ impl Runtime {
 
         if let Some(first) = self.loaded_classes.get_mut(&name) {
             let mut second = cls;
-            if let Class::Java(_) = first && let Class::Java(_) = second {
+            if let (&Class::Java(_), &Class::Java(_)) = (&first, &second) {
                 panic!("merging JavaClass with JavaClass not yet supported (ERR in loading class {name})");
             }
             match (&first, &second) {

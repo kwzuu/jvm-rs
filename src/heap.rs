@@ -9,7 +9,7 @@ use crate::class::Class;
 
 use crate::JavaClass;
 
-use crate::things::{Array, Object, Value};
+use crate::values::{Array, Object, Value};
 
 struct Chunk {
     layout: Layout,

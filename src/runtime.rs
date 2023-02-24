@@ -1,7 +1,5 @@
-
-
 use crate::method::{Method};
-use crate::stack_frame::StackFrame;
+use crate::stack::StackFrame;
 use crate::{JavaClass, ClassReader};
 
 use std::collections::HashMap;
@@ -10,7 +8,7 @@ use std::ptr::{null_mut};
 use crate::class::{Class, NativeClass};
 use crate::descriptor::Type;
 use crate::heap::Heap;
-use crate::things::Value;
+use crate::values::Value;
 
 pub const CLASSPATH: &[&str] = &[
     "./",
@@ -98,20 +96,10 @@ impl Runtime {
             .expect("finding main method failed! checked `static int main()`, \
             `static long main`, `static void main(String[])`");
 
-        // frame will later(tm) contain the String[] for the `String[] args`
-        let mut frame = StackFrame::new_for(main_method);
-
-        let result = main_method.exec(
+        main_method.exec(
             self,
             self.main_class,
-            &mut frame
-        ).unwrap();
-
-        match main_method.descriptor().ret {
-            Type::Int => { dbg!(result.int()); },
-            Type::Void => {},
-            _ => panic!("unsupported return type!"),
-        };
+        )
     }
 
     pub fn add_class(&mut self, cls: Class) {

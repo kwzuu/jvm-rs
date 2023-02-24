@@ -6,7 +6,7 @@ use crate::method::{JavaMethod, Method};
 use crate::{ClassReader, Runtime};
 use std::collections::HashMap;
 use crate::class::Class::{Java, Native};
-use crate::things::{Object, Value};
+use crate::values::{Object, Value};
 
 pub(crate) mod access_flags {
     pub const PUBLIC: u16 = 0x0001;

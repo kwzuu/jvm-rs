@@ -1,8 +1,8 @@
-use std::alloc::{alloc, dealloc, Layout, LayoutError};
-use std::mem;
+use std::alloc::{alloc, Layout, LayoutError};
+
 use std::mem::size_of;
-use std::ptr::{addr_of, addr_of_mut, null_mut};
-use crate::class::{Class, JavaClass};
+use std::ptr::{null_mut};
+use crate::class::{JavaClass};
 use crate::method::JavaMethod;
 use crate::values::Value;
 
@@ -22,6 +22,7 @@ pub struct Stack {
 impl Stack {
     pub(crate) unsafe fn new() -> Self {
         let bottom = alloc(LAYOUT.unwrap());
+        dbg!(bottom as usize);
         Self {
             bottom: bottom as *mut StackFrame,
             current: bottom as *mut StackFrame,
@@ -38,7 +39,7 @@ impl Stack {
     }
 
     /// push, initialize and return a new frame
-    fn call(
+    pub fn call(
         &mut self,
         method: *const JavaMethod,
         class: *mut JavaClass
@@ -57,6 +58,16 @@ impl Stack {
             ) }
             self.current
         }
+    }
+
+    pub fn main(
+        &mut self,
+        method: *const JavaMethod,
+        class: *mut JavaClass,
+    ) -> *mut StackFrame {
+        // TODO: we assume that nobody sets XSS smaller than the main method. this is not a good assumption to make.
+        unsafe { StackFrame::initialize_at(self.current, null_mut(), method, class); }
+        self.current
     }
 }
 
@@ -89,16 +100,21 @@ impl StackFrame {
         // class the method belongs to
         class: *mut JavaClass,
     ) {
+        println!("initializing new stackframe!");
+
         let meth = &*method;
         let code = meth.code.as_ref().expect("called abstract method");
 
         let max_stack_and_locals = code.max_stack as u32 + code.max_locals as u32;
-
+        dbg!(code.max_stack);
+        dbg!(code.max_locals);
+        dbg!(max_stack_and_locals);
 
         let frame = &mut *addr;
 
         // initialize references to frame above and below
         let stride = size_of::<Self>() + max_stack_and_locals as usize * size_of::<Value>();
+        dbg!(stride);
         frame.under = under;
         frame.above = under.byte_add(stride);
 
@@ -113,6 +129,41 @@ impl StackFrame {
 
         for i in 0..max_stack_and_locals as usize {
             frame.stack_and_locals.as_mut_ptr().add(i).write(Value::NULL)
+        }
+    }
+
+    #[inline(never)]
+    pub fn push(&mut self, value: Value) {
+        unsafe {
+            let ptr = self.stack_and_locals.as_mut_ptr().add(self.stack_ptr as usize);
+            ptr.write(value);
+        }
+
+        self.stack_ptr += 1;
+    }
+
+    pub fn pop(&mut self) -> Value {
+        self.stack_ptr -= 1;
+        unsafe {
+            self.stack_and_locals.as_mut_ptr()
+                .add(self.stack_ptr as usize)
+                .read()
+        }
+    }
+
+    pub fn get(&mut self, n: u16) -> Value {
+        unsafe {
+            self.stack_and_locals.as_mut_ptr()
+                .add(n as usize)
+                .read()
+        }
+    }
+
+    pub fn set(&mut self, n: u16, value: Value) {
+        unsafe {
+            self.stack_and_locals.as_mut_ptr()
+                .add(n as usize)
+                .write(value);
         }
     }
 }

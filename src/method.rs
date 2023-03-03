@@ -1,17 +1,18 @@
 use std::cmp::Ordering;
 use crate::attributes::code::Code;
 use crate::attributes::code_reader::CodeReader;
-use crate::bytecode::Instruction;
-
 use crate::constant_pool::ConstantPoolInfo;
 use crate::method_info::MethodInfo;
-use crate::stack::{Stack, StackFrame};
-use crate::values::{Value};
+use crate::stack::{Stack};
+use crate::values::Value;
 use crate::{descriptor, JavaClass, Runtime};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+use std::process::exit;
+use std::ptr::null_mut;
+use crate::bytecode::Instruction;
 
-use crate::descriptor::DescriptorInfo;
+use crate::descriptor::{DescriptorInfo, Type};
 
 #[derive(Debug)]
 pub enum Method {
@@ -113,27 +114,78 @@ impl JavaMethod {
     // this lets us define a stack size and handle exceptions much more easily
     pub fn exec(
         &self,
-        runtime: &mut Runtime,
+        _runtime: &mut Runtime,
         class: *mut JavaClass,
     ) {
         let my_class = unsafe { &mut *class };
         println!("{}.{}:{} called", my_class.name, self.name, self.descriptor);
 
-        let mut frame_stack: Stack = unsafe { Stack::new() };
-        
+
         let mut method = self;
+        let mut code = method.code.as_ref().unwrap();
         let mut class = class;
         let mut pc = 0;
-        
+
+        let mut frame_stack: Stack = unsafe { Stack::new() };
+
+        let mut current_frame = unsafe { &mut *frame_stack.main(method, class) };
+
         // restore previous execution context
-        let pop = || unsafe {
-            let new_frame = &mut *frame_stack.ret();
-            method = &*new_frame.method;
-            class = new_frame.class;
-            pc = new_frame.program_counter;
-        };
-        
-        
+        // cant put it in a closure because borrow checker
+        macro_rules! ret {
+            () => {
+                unsafe {
+                    // get our return value if we want it
+                    let return_value = if method.parsed_descriptor.ret != Type::Void {
+                        Some(current_frame.pop())
+                    } else {
+                        None
+                    };
+
+                    // pop the frame
+                    let frame = frame_stack.ret();
+
+                    // its quirky so we check for null*ish* values
+                    if (frame as usize) < 0xFF {
+                        // we are returning from main
+                        println!("returning from main!");
+                        dbg!(return_value);
+                        exit(0);
+                    }
+                    current_frame = &mut *frame;
+
+                    // push return value
+                    if let Some(val) = return_value {
+                        current_frame.push(val)
+                    }
+
+                    // restore execution context
+                    method = &*current_frame.method;
+                    code = method.code.as_ref().unwrap();
+                    class = current_frame.class;
+                    pc = current_frame.program_counter;
+                }
+            }
+        }
+
+        loop {
+            let instruction = code.code[pc as usize];
+            match instruction {
+                Instruction::Return |
+                Instruction::Ireturn |
+                Instruction::Areturn |
+                Instruction::Freturn |
+                Instruction::Dreturn => ret!(),
+                Instruction::Iconst0 => current_frame.push(Value::ICONST_0),
+                Instruction::Iconst2 => current_frame.push(Value::ICONST_2),
+                x => { panic!("unimplemented instruction {:?}", x) }
+            }
+
+            pc += 1;
+            if pc > code.code.len() as u32 {
+                panic!("code overrun! this should never happen.")
+            }
+        }
     }
 
     /*

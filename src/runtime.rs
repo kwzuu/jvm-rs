@@ -1,12 +1,12 @@
 use crate::method::{Method};
-use crate::stack::StackFrame;
+
 use crate::{JavaClass, ClassReader};
 
 use std::collections::HashMap;
 use std::ptr::{null_mut};
 
 use crate::class::{Class, NativeClass};
-use crate::descriptor::Type;
+
 use crate::heap::Heap;
 use crate::values::Value;
 

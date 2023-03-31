@@ -1,7 +1,9 @@
 use std::alloc::{alloc, Layout, LayoutError};
+use std::fmt::{Debug, Formatter};
 
 use std::mem::size_of;
 use std::ptr::{null_mut};
+use std::slice;
 use crate::class::{JavaClass};
 use crate::method::JavaMethod;
 use crate::values::Value;
@@ -71,6 +73,7 @@ impl Stack {
     }
 }
 
+#[repr(C)]
 pub struct StackFrame {
     // the frame this one is on top of
     under: *mut StackFrame,
@@ -78,13 +81,14 @@ pub struct StackFrame {
     above: *mut StackFrame,
 
     // execution context
-    pub program_counter: u32,
     pub method: *const JavaMethod,
     pub class: *mut JavaClass,
 
     // operand stack and locals
     pub max_stack_and_locals: u32,
     stack_ptr: u32,
+    pub program_counter: u16,
+
     stack_and_locals: [Value; 0],
 }
 
@@ -100,21 +104,15 @@ impl StackFrame {
         // class the method belongs to
         class: *mut JavaClass,
     ) {
-        println!("initializing new stackframe!");
-
         let meth = &*method;
         let code = meth.code.as_ref().expect("called abstract method");
 
         let max_stack_and_locals = code.max_stack as u32 + code.max_locals as u32;
-        dbg!(code.max_stack);
-        dbg!(code.max_locals);
-        dbg!(max_stack_and_locals);
 
         let frame = &mut *addr;
 
         // initialize references to frame above and below
         let stride = size_of::<Self>() + max_stack_and_locals as usize * size_of::<Value>();
-        dbg!(stride);
         frame.under = under;
         frame.above = under.byte_add(stride);
 
@@ -126,10 +124,6 @@ impl StackFrame {
         // initialize stack and locals
         frame.max_stack_and_locals = max_stack_and_locals;
         frame.stack_ptr = code.max_locals as u32;
-
-        for i in 0..max_stack_and_locals as usize {
-            frame.stack_and_locals.as_mut_ptr().add(i).write(Value::NULL)
-        }
     }
 
     #[inline(never)]
@@ -161,9 +155,30 @@ impl StackFrame {
 
     pub fn set(&mut self, n: u16, value: Value) {
         unsafe {
-            self.stack_and_locals.as_mut_ptr()
-                .add(n as usize)
-                .write(value);
+            let vars = self.stack_and_locals.as_mut_ptr();
+            let ptr = vars.add(n as usize);
+            ptr.write(value);
         }
+    }
+
+    pub fn stack_and_locals(&self) -> &[Value] {
+        unsafe {
+            slice::from_raw_parts(
+                self.stack_and_locals.as_ptr(),
+                self.stack_ptr as usize
+            ) as &[Value]
+        }
+    }
+}
+
+impl Debug for StackFrame {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StackFrame")
+            .field("under", &(self.under as usize))
+            .field("above", &(self.above as usize))
+            .field("method", unsafe { &(&*self.method).name })
+            .field("class", unsafe { &(&*self.class).name })
+            .field("stack", &self.stack_and_locals())
+            .finish()
     }
 }

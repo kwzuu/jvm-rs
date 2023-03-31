@@ -2,6 +2,7 @@
 #![feature(fn_traits)]
 #![feature(let_chains)]
 #![feature(map_try_insert)]
+#![feature(try_trait_v2)]
 #![allow(dead_code)]
 
 extern crate core;
@@ -49,6 +50,20 @@ fn main() -> Result<(), std::io::Error> {
 
     let _ = &mut runtime.run_main();
     Ok(())
+}
+
+pub trait OptionAssert {
+    fn assert_eq(self, other: &Self) -> Option<Self> where Self: Sized;
+}
+
+impl<T: PartialEq> OptionAssert for T {
+    fn assert_eq(self, other: &Self) -> Option<Self> {
+        if &self == other {
+            Some(self)
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(feature = "multithreaded")]

@@ -118,11 +118,13 @@ impl JavaMethod {
         class: *mut JavaClass,
     ) {
         let my_class = unsafe { &mut *class };
-        println!("{}.{}:{} called", my_class.name, self.name, self.descriptor);
+        println!("{}.{}:{} called; code={:?}",
+                 my_class.name, self.name, self.descriptor, self.code);
 
 
         let mut method = self;
         let mut code = method.code.as_ref().unwrap();
+
         let mut class = class;
         let mut pc = 0;
 
@@ -143,16 +145,20 @@ impl JavaMethod {
                     };
 
                     // pop the frame
-                    let frame = frame_stack.ret();
+                    let new_frame = frame_stack.ret();
 
+                    dbg!(new_frame as usize);
                     // its quirky so we check for null*ish* values
-                    if (frame as usize) < 0xFF {
+                    if (new_frame as usize) < 0xFF {
                         // we are returning from main
                         println!("returning from main!");
-                        dbg!(return_value);
+                        if let Some(v) = return_value {
+                            println!("return value = {}", v.int());
+                        }
                         exit(0);
                     }
-                    current_frame = &mut *frame;
+
+                    current_frame = &mut *new_frame;
 
                     // push return value
                     if let Some(val) = return_value {
@@ -169,20 +175,53 @@ impl JavaMethod {
         }
 
         loop {
+            // ultra diagnostic information!
+            // dbg!(&current_frame);
+
             let instruction = code.code[pc as usize];
+            println!("{pc}: {:?}", &instruction);
             match instruction {
                 Instruction::Return |
                 Instruction::Ireturn |
                 Instruction::Areturn |
                 Instruction::Freturn |
                 Instruction::Dreturn => ret!(),
-                Instruction::Iconst0 => current_frame.push(Value::ICONST_0),
-                Instruction::Iconst2 => current_frame.push(Value::ICONST_2),
+                Instruction::Ipush(x) => current_frame.push(Value::nint(x as i32)),
+                Instruction::Istore(n) => {
+                    let val = current_frame.pop();
+                    current_frame.set(n, val)
+                }
+                Instruction::Iload(n) => {
+                    let val = current_frame.get(n);
+                    current_frame.push(val)
+                }
+                Instruction::IfIcmpge(branch) => {
+                    let value2 = current_frame.pop();
+                    let value1 = current_frame.pop();
+                    if value1.int() >= value2.int() {
+                        pc = branch;
+                        continue
+                    }
+                }
+                Instruction::Goto(addr) => {
+                    pc = addr;
+                    continue
+                }
+                Instruction::Imul => {
+                    let value1 = current_frame.pop().int();
+                    let value2 = current_frame.pop().int();
+                    current_frame.push(Value::nint(value1 * value2))
+                }
+                Instruction::Iinc(var, by) => {
+                    let old = current_frame.get(var as u16).int();
+                    let new = old + (by as i32);
+                    current_frame.set(var as u16, Value::nint(new))
+                }
                 x => { panic!("unimplemented instruction {:?}", x) }
             }
 
             pc += 1;
-            if pc > code.code.len() as u32 {
+            if pc > code.code.len() as u16 {
                 panic!("code overrun! this should never happen.")
             }
         }

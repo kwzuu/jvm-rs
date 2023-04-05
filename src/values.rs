@@ -122,7 +122,7 @@ impl Display for Value {
 
 impl Debug for Value {
   fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-    f.write_str(&*format!("{:016x}", unsafe { self.long }))
+    <Self as Display>::fmt(self, f)
   }
 }
 
@@ -134,5 +134,16 @@ impl From<ConstantPoolInfo> for Value {
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         unsafe { self.long == other.long }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::mem::size_of;
+    use super::*;
+
+    #[test]
+    fn test_value() {
+        assert_eq!(size_of::<Value>(), 8);
     }
 }

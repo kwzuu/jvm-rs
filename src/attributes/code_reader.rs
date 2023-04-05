@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::attributes::attribute_info::AttributeInfo;
 use crate::attributes::code::{Code, ExceptionTableItem};
 use crate::attributes::code_reader::CodeParseError::{EarlyEnd, InvalidFormat};
@@ -9,9 +10,10 @@ pub struct CodeReader<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub enum CodeParseError<'a> {
-    EarlyEnd(&'a str),
+pub enum CodeParseError {
+    EarlyEnd(String),
     InvalidFormat,
+    BytecodeParseError(BytecodeParseError),
 }
 
 impl<'a> CodeReader<'a> {
@@ -37,17 +39,17 @@ impl<'a> CodeReader<'a> {
         Some(hi << 16 | lo)
     }
 
-    fn read_attribute(&mut self) -> Result<AttributeInfo, CodeParseError<'a>> {
+    fn read_attribute(&mut self) -> Result<AttributeInfo, CodeParseError> {
         let mut ai = AttributeInfo {
-            name_index: self.read_u2().ok_or(EarlyEnd("attr name index"))?,
-            attribute_length: self.read_u4().ok_or(EarlyEnd("attr len"))?,
+            name_index: self.read_u2().ok_or(EarlyEnd("attr name index".to_string()))?,
+            attribute_length: self.read_u4().ok_or(EarlyEnd("attr len".to_string()))?,
             info: vec![],
         };
         ai.info.reserve(ai.attribute_length as usize);
         for _ in 0..ai.attribute_length {
             match self.bytes.next() {
                 Some(x) => ai.info.push(*x),
-                None => return Err(EarlyEnd("attr")),
+                None => return Err(EarlyEnd("attr".to_string())),
             }
         }
         Ok(ai)
@@ -62,45 +64,36 @@ impl<'a> CodeReader<'a> {
         })
     }
 
-    pub fn read_code(&mut self) -> Result<Code, CodeParseError<'a>> {
+    pub fn read_code(&mut self) -> Result<Code, CodeParseError> {
         let mut code = Code {
-            max_stack: self.read_u2().ok_or(EarlyEnd("max stack"))?,
-            max_locals: self.read_u2().ok_or(EarlyEnd("max locals"))?,
+            max_stack: self.read_u2().ok_or(EarlyEnd("max stack".to_string()))?,
+            max_locals: self.read_u2().ok_or(EarlyEnd("max locals".to_string()))?,
             code: vec![],
             exception_table: vec![],
             attributes: vec![],
         };
 
-        let code_length = self.read_u4().ok_or(EarlyEnd("code len"))?;
-        // dbg!(code_length);
+        let code_length = self.read_u4().ok_or(EarlyEnd("code len".to_string()))?;
         let mut bytecode: Vec<u8> = Vec::with_capacity(code_length as usize);
 
         for _ in 0..code_length {
-            bytecode.push(self.read_u1().ok_or(EarlyEnd("bytecode"))?)
-        }
-        let mut bytecode = bytecode.iter();
-
-        loop {
-            code.code.push(match Instruction::read_from(&mut bytecode) {
-                Ok(x) => x,
-                Err(BytecodeParseError::EarlyEnd) => break,
-                Err(BytecodeParseError::InvalidOpcode(_)) => return Err(InvalidFormat),
-            });
+            bytecode.push(self.read_u1().ok_or(EarlyEnd("bytecode".to_string()))?)
         }
 
-        // dbg!(&code.code);
+        code.code = Instruction::read_from(bytecode.as_slice(), code_length)
+            .map_err(CodeParseError::BytecodeParseError)?;
+
+        dbg!(code.code.as_slice());
 
         let exception_table_length = self.read_u2().unwrap();
-        // dbg!(exception_table_length);
 
         code.exception_table
             .reserve(exception_table_length as usize);
 
-        // dbg!(exception_table_length);
         for _ in 0..exception_table_length {
             code.exception_table.push(
                 self.read_exception_table_item()
-                    .ok_or(EarlyEnd("exception table"))?,
+                    .ok_or(EarlyEnd("exception table".to_string()))?,
             );
         }
 

@@ -4,7 +4,7 @@ use crate::{Runtime};
 use crate::class::{NativeClass, access_flags::*};
 use crate::descriptor::{DescriptorInfo, Type};
 use crate::method::{NativeMethod, Method::Native, Method};
-use crate::things::Value;
+use crate::values::Value;
 
 pub fn object(runtime: &mut Runtime) {
     runtime.add_native_class(

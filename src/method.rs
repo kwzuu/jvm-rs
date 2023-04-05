@@ -1,17 +1,18 @@
 use std::cmp::Ordering;
 use crate::attributes::code::Code;
 use crate::attributes::code_reader::CodeReader;
-use crate::bytecode::Instruction;
-
 use crate::constant_pool::ConstantPoolInfo;
 use crate::method_info::MethodInfo;
-use crate::stack_frame::StackFrame;
-use crate::things::{Value};
+use crate::stack::{Stack};
+use crate::values::Value;
 use crate::{descriptor, JavaClass, Runtime};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+use std::process::exit;
+use std::ptr::null_mut;
+use crate::bytecode::Instruction;
 
-use crate::descriptor::DescriptorInfo;
+use crate::descriptor::{DescriptorInfo, Type};
 
 #[derive(Debug)]
 pub enum Method {
@@ -28,15 +29,16 @@ impl Method {
         &self,
         runtime: &mut Runtime,
         class: *mut JavaClass,
-        stack_frame: &mut StackFrame,
-    ) -> Option<Value> {
+    ) -> () {
         match self {
             Method::Native(m) => {
                 let f = &m.func;
-                f.call((m, runtime, class))
+                f.call((m, runtime, class));
             },
-            Method::Java(m) => m.exec(runtime, class, stack_frame)
-        }
+            Method::Java(m) => {
+                m.exec(runtime, class);
+            }
+        };
     }
 
     pub fn descriptor(&self) -> &DescriptorInfo {
@@ -108,6 +110,124 @@ impl JavaMethod {
         self.access_flags | 8 != 0
     }
 
+    // new exec impl that doesnt use the rust stack for the java stack
+    // this lets us define a stack size and handle exceptions much more easily
+    pub fn exec(
+        &self,
+        _runtime: &mut Runtime,
+        class: *mut JavaClass,
+    ) {
+        let my_class = unsafe { &mut *class };
+        println!("{}.{}:{} called; code={:?}",
+                 my_class.name, self.name, self.descriptor, self.code);
+
+
+        let mut method = self;
+        let mut code = method.code.as_ref().unwrap();
+
+        let mut class = class;
+        let mut pc = 0;
+
+        let mut frame_stack: Stack = unsafe { Stack::new() };
+
+        let mut current_frame = unsafe { &mut *frame_stack.main(method, class) };
+
+        // restore previous execution context
+        // cant put it in a closure because borrow checker
+        macro_rules! ret {
+            () => {
+                unsafe {
+                    // get our return value if we want it
+                    let return_value = if method.parsed_descriptor.ret != Type::Void {
+                        Some(current_frame.pop())
+                    } else {
+                        None
+                    };
+
+                    // pop the frame
+                    let new_frame = frame_stack.ret();
+
+                    dbg!(new_frame as usize);
+                    // its quirky so we check for null*ish* values
+                    if (new_frame as usize) < 0xFF {
+                        // we are returning from main
+                        println!("returning from main!");
+                        if let Some(v) = return_value {
+                            println!("return value = {}", v.int());
+                        }
+                        exit(0);
+                    }
+
+                    current_frame = &mut *new_frame;
+
+                    // push return value
+                    if let Some(val) = return_value {
+                        current_frame.push(val)
+                    }
+
+                    // restore execution context
+                    method = &*current_frame.method;
+                    code = method.code.as_ref().unwrap();
+                    class = current_frame.class;
+                    pc = current_frame.program_counter;
+                }
+            }
+        }
+
+        loop {
+            // ultra diagnostic information!
+            // dbg!(&current_frame);
+
+            let instruction = code.code[pc as usize];
+            println!("{pc}: {:?}", &instruction);
+            match instruction {
+                Instruction::Return |
+                Instruction::Ireturn |
+                Instruction::Areturn |
+                Instruction::Freturn |
+                Instruction::Dreturn => ret!(),
+                Instruction::Ipush(x) => current_frame.push(Value::nint(x as i32)),
+                Instruction::Istore(n) => {
+                    let val = current_frame.pop();
+                    current_frame.set(n, val)
+                }
+                Instruction::Iload(n) => {
+                    let val = current_frame.get(n);
+                    current_frame.push(val)
+                }
+                Instruction::IfIcmpge(branch) => {
+                    let value2 = current_frame.pop();
+                    let value1 = current_frame.pop();
+                    if value1.int() >= value2.int() {
+                        pc = branch;
+                        continue
+                    }
+                }
+                Instruction::Goto(addr) => {
+                    pc = addr;
+                    continue
+                }
+                Instruction::Imul => {
+                    let value1 = current_frame.pop().int();
+                    let value2 = current_frame.pop().int();
+                    current_frame.push(Value::nint(value1 * value2))
+                }
+                Instruction::Iinc(var, by) => {
+                    let old = current_frame.get(var as u16).int();
+                    let new = old + (by as i32);
+                    current_frame.set(var as u16, Value::nint(new))
+                }
+                x => { panic!("unimplemented instruction {:?}", x) }
+            }
+
+            pc += 1;
+            if pc > code.code.len() as u16 {
+                panic!("code overrun! this should never happen.")
+            }
+        }
+    }
+
+    /*
     pub fn exec(
         &self,
         runtime: &mut Runtime,
@@ -125,68 +245,73 @@ impl JavaMethod {
             match code.code[pc] {
                 // Constants and NOP
                 Instruction::Nop => {},
-                Instruction::AconstNull => stack_frame.operand_stack.push(Value::NULL),
-                Instruction::IconstM1 => stack_frame.operand_stack.push(Value::ICONST_M1),
-                Instruction::Iconst0 => stack_frame.operand_stack.push(Value::ICONST_0),
-                Instruction::Iconst1 => stack_frame.operand_stack.push(Value::ICONST_1),
-                Instruction::Iconst2 => stack_frame.operand_stack.push(Value::ICONST_2),
-                Instruction::Iconst3 => stack_frame.operand_stack.push(Value::ICONST_3),
-                Instruction::Iconst4 => stack_frame.operand_stack.push(Value::ICONST_4),
-                Instruction::Iconst5 => stack_frame.operand_stack.push(Value::ICONST_5),
-                Instruction::Lconst0 => stack_frame.operand_stack.push(Value::LCONST_0),
-                Instruction::Lconst1 => stack_frame.operand_stack.push(Value::LCONST_1),
-                Instruction::Fconst0 => stack_frame.operand_stack.push(Value::FCONST_0),
-                Instruction::Fconst1 => stack_frame.operand_stack.push(Value::FCONST_1),
-                Instruction::Fconst2 => stack_frame.operand_stack.push(Value::FCONST_2),
-                Instruction::Dconst0 => stack_frame.operand_stack.push(Value::DCONST_0),
-                Instruction::Dconst1 => stack_frame.operand_stack.push(Value::DCONST_1),
+                Instruction::AconstNull => stack_frame.push(Value::NULL),
+                Instruction::IconstM1 => stack_frame.push(Value::ICONST_M1),
+                Instruction::Iconst0 => stack_frame.push(Value::ICONST_0),
+                Instruction::Iconst1 => stack_frame.push(Value::ICONST_1),
+                Instruction::Iconst2 => stack_frame.push(Value::ICONST_2),
+                Instruction::Iconst3 => stack_frame.push(Value::ICONST_3),
+                Instruction::Iconst4 => stack_frame.push(Value::ICONST_4),
+                Instruction::Iconst5 => stack_frame.push(Value::ICONST_5),
+                Instruction::Lconst0 => stack_frame.push(Value::LCONST_0),
+                Instruction::Lconst1 => stack_frame.push(Value::LCONST_1),
+                Instruction::Fconst0 => stack_frame.push(Value::FCONST_0),
+                Instruction::Fconst1 => stack_frame.push(Value::FCONST_1),
+                Instruction::Fconst2 => stack_frame.push(Value::FCONST_2),
+                Instruction::Dconst0 => stack_frame.push(Value::DCONST_0),
+                Instruction::Dconst1 => stack_frame.push(Value::DCONST_1),
 
-                // Load nonconstants onto the operand stack
-                Instruction::Bipush(x) => stack_frame.operand_stack.push(Value::nint(x as i32)),
-                Instruction::Sipush(x) => stack_frame.operand_stack.push(Value::nint(x as i32)),
+                // Load locals onto the operand stack
+                Instruction::Bipush(x) => stack_frame.push(Value::nint(x as i32)),
+                Instruction::Sipush(x) => stack_frame.push(Value::nint(x as i32)),
                 Instruction::Ldc(x) => {
                     let cpi = get_cpi(x as u16);
-                    stack_frame.operand_stack.push(
+                    stack_frame.push(
                         Value::from(cpi)
                     )
                 },
                 Instruction::LdcW(x) => {
                     let cpi = get_cpi(x);
-                    stack_frame.operand_stack.push(
+                    stack_frame.push(
                         Value::from(cpi)
                     )
                 },
                 Instruction::Ldc2W(x) => {
                     let cpi = get_cpi(x);
-                    stack_frame.operand_stack.push(
+                    stack_frame.push(
                         Value::from(cpi)
                     )
                 },
-                Instruction::Iload(x) => stack_frame.operand_stack.push(stack_frame.locals[x as usize]),
-                Instruction::Lload(x) => stack_frame.operand_stack.push(stack_frame.locals[x as usize]),
-                Instruction::Fload(x) => stack_frame.operand_stack.push(stack_frame.locals[x as usize]),
-                Instruction::Dload(x) => stack_frame.operand_stack.push(stack_frame.locals[x as usize]),
-                Instruction::Aload(x) => stack_frame.operand_stack.push(stack_frame.locals[x as usize]),
-                Instruction::Iload0 => stack_frame.operand_stack.push(stack_frame.locals[0]),
-                Instruction::Iload1 => stack_frame.operand_stack.push(stack_frame.locals[1]),
-                Instruction::Iload2 => stack_frame.operand_stack.push(stack_frame.locals[2]),
-                Instruction::Iload3 => stack_frame.operand_stack.push(stack_frame.locals[3]),
-                Instruction::Lload0 => stack_frame.operand_stack.push(stack_frame.locals[0]),
-                Instruction::Lload1 => stack_frame.operand_stack.push(stack_frame.locals[1]),
-                Instruction::Lload2 => stack_frame.operand_stack.push(stack_frame.locals[2]),
-                Instruction::Lload3 => stack_frame.operand_stack.push(stack_frame.locals[3]),
-                Instruction::Fload0 => stack_frame.operand_stack.push(stack_frame.locals[0]),
-                Instruction::Fload1 => stack_frame.operand_stack.push(stack_frame.locals[1]),
-                Instruction::Fload2 => stack_frame.operand_stack.push(stack_frame.locals[2]),
-                Instruction::Fload3 => stack_frame.operand_stack.push(stack_frame.locals[3]),
-                Instruction::Dload0 => stack_frame.operand_stack.push(stack_frame.locals[0]),
-                Instruction::Dload1 => stack_frame.operand_stack.push(stack_frame.locals[1]),
-                Instruction::Dload2 => stack_frame.operand_stack.push(stack_frame.locals[2]),
-                Instruction::Dload3 => stack_frame.operand_stack.push(stack_frame.locals[3]),
-                Instruction::Aload0 => stack_frame.operand_stack.push(stack_frame.locals[0]),
-                Instruction::Aload1 => stack_frame.operand_stack.push(stack_frame.locals[1]),
-                Instruction::Aload2 => stack_frame.operand_stack.push(stack_frame.locals[2]),
-                Instruction::Aload3 => stack_frame.operand_stack.push(stack_frame.locals[3]),
+                Instruction::Iload(x) => stack_frame.push(stack_frame.get(x as usize)),
+                Instruction::Lload(x) => stack_frame.push(stack_frame.get(x as usize)),
+                Instruction::Fload(x) => stack_frame.push(stack_frame.get(x as usize)),
+                Instruction::Dload(x) => stack_frame.push(stack_frame.get(x as usize)),
+                Instruction::Aload(x) => stack_frame.push(stack_frame.get(x as usize)),
+
+                Instruction::Iload0 => stack_frame.push(stack_frame.get(0)),
+                Instruction::Iload1 => stack_frame.push(stack_frame.get(1)),
+                Instruction::Iload2 => stack_frame.push(stack_frame.get(2)),
+                Instruction::Iload3 => stack_frame.push(stack_frame.get(3)),
+
+                Instruction::Lload0 => stack_frame.push(stack_frame.get(0)),
+                Instruction::Lload1 => stack_frame.push(stack_frame.get(1)),
+                Instruction::Lload2 => stack_frame.push(stack_frame.get(2)),
+                Instruction::Lload3 => stack_frame.push(stack_frame.get(3)),
+
+                Instruction::Fload0 => stack_frame.push(stack_frame.get(0)),
+                Instruction::Fload1 => stack_frame.push(stack_frame.get(1)),
+                Instruction::Fload2 => stack_frame.push(stack_frame.get(2)),
+                Instruction::Fload3 => stack_frame.push(stack_frame.get(3)),
+
+                Instruction::Dload0 => stack_frame.push(stack_frame.get(0)),
+                Instruction::Dload1 => stack_frame.push(stack_frame.get(1)),
+                Instruction::Dload2 => stack_frame.push(stack_frame.get(2)),
+                Instruction::Dload3 => stack_frame.push(stack_frame.get(3)),
+
+                Instruction::Aload0 => stack_frame.push(stack_frame.get(0)),
+                Instruction::Aload1 => stack_frame.push(stack_frame.get(1)),
+                Instruction::Aload2 => stack_frame.push(stack_frame.get(2)),
+                Instruction::Aload3 => stack_frame.push(stack_frame.get(3)),
                 Instruction::Iaload => {
                     todo!("arrays no worky");
                 },
@@ -202,372 +327,372 @@ impl JavaMethod {
                 
                 // arithmetic
                 Instruction::Iadd => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.int() + b.int()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.int() + b.int()))
                 },
                 Instruction::Ladd => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nlong(a.long() + b.long()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nlong(a.long() + b.long()))
                 },
                 Instruction::Fadd => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nfloat(a.float() + b.float()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nfloat(a.float() + b.float()))
                 },
                 Instruction::Dadd => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::ndouble(a.double() + b.double()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::ndouble(a.double() + b.double()))
                 },
                 Instruction::Isub => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.int() - b.int()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.int() - b.int()))
                 },
                 Instruction::Lsub => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nlong(a.long() - b.long()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nlong(a.long() - b.long()))
                 },
                 Instruction::Fsub => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nfloat(a.float() - b.float()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nfloat(a.float() - b.float()))
                 },
                 Instruction::Dsub => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::ndouble(a.double() - b.double()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::ndouble(a.double() - b.double()))
                 },
                 Instruction::Imul => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.int() * b.int()))
+                    let one = stack_frame.pop().int();
+                    let two = stack_frame.pop().int();
+                    stack_frame.push(Value::nint(one * two))
                 },
                 Instruction::Lmul => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nlong(a.long() * b.long()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nlong(a.long() * b.long()))
                 },
                 Instruction::Fmul => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nfloat(a.float() * b.float()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nfloat(a.float() * b.float()))
                 },
                 Instruction::Dmul => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::ndouble(a.double() * b.double()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::ndouble(a.double() * b.double()))
                 },
                 Instruction::Idiv => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.int() / b.int()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.int() / b.int()))
                 },
                 Instruction::Ldiv => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nlong(a.long() / b.long()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nlong(a.long() / b.long()))
                 },
                 Instruction::Fdiv => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nfloat(a.float() / b.float()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nfloat(a.float() / b.float()))
                 },
                 Instruction::Ddiv => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::ndouble(a.double() / b.double()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::ndouble(a.double() / b.double()))
                 },
                 Instruction::Irem => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.int() % b.int()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.int() % b.int()))
                 },
                 Instruction::Lrem => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nlong(a.long() % b.long()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nlong(a.long() % b.long()))
                 },
                 Instruction::Frem => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nfloat(a.float() % b.float()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nfloat(a.float() % b.float()))
                 },
                 Instruction::Drem => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::ndouble(a.double() % b.double()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::ndouble(a.double() % b.double()))
                 },
                 Instruction::Ineg => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(-a.int()))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::nint(-a.int()))
                 },
                 Instruction::Lneg => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nlong(-a.long()))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::nlong(-a.long()))
                 },
                 Instruction::Fneg => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nfloat(-a.float()))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::nfloat(-a.float()))
                 },
                 Instruction::Dneg => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::ndouble(-a.double()))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::ndouble(-a.double()))
                 },
                 Instruction::Ishl => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.int() << b.int()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.int() << b.int()))
                 },
                 Instruction::Lshl => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nlong(a.long() << b.long()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nlong(a.long() << b.long()))
                 },
                 Instruction::Ishr => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.int() >> b.int()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.int() >> b.int()))
                 },
                 Instruction::Lshr => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nlong(a.long() >> b.long()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nlong(a.long() >> b.long()))
                 },
                 Instruction::Iushr => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.int() >> b.int()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.int() >> b.int()))
                 },
                 Instruction::Lushr => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nlong(a.long() >> b.long()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nlong(a.long() >> b.long()))
                 },
                 Instruction::Iand => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.int() & b.int()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.int() & b.int()))
                 },
                 Instruction::Land => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nlong(a.long() & b.long()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nlong(a.long() & b.long()))
                 },
                 Instruction::Ior => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.int() | b.int()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.int() | b.int()))
                 },
                 Instruction::Lor => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nlong(a.long() | b.long()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nlong(a.long() | b.long()))
                 },
                 Instruction::Ixor => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.int() ^ b.int()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.int() ^ b.int()))
                 },
                 Instruction::Lxor => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nlong(a.long() ^ b.long()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nlong(a.long() ^ b.long()))
                 },
-                Instruction::Iinc(local_var_indx, r#const) => {
-                    let local_var = stack_frame.locals.get_mut(local_var_indx as usize).expect("no local variable");
-
-                    *local_var = Value::nint(local_var.int() + r#const as i32);
+                Instruction::Iinc(index, n) => {
+                    let old = stack_frame.get(index as usize);
+                    let new = old.int() + (n as i32);
+                    stack_frame.set(index as usize, Value::nint(new));
                 },
                 Instruction::I2l => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nlong(a.int() as i64))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::nlong(a.int() as i64))
                 },
                 Instruction::I2f => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nfloat(a.int() as f32))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::nfloat(a.int() as f32))
                 },
                 Instruction::I2d => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::ndouble(a.int() as f64))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::ndouble(a.int() as f64))
                 },
                 Instruction::L2i => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.long() as i32))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.long() as i32))
                 },
                 Instruction::L2f => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nfloat(a.long() as f32))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::nfloat(a.long() as f32))
                 },
                 Instruction::L2d => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::ndouble(a.long() as f64))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::ndouble(a.long() as f64))
                 },
                 Instruction::F2i => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.float() as i32))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.float() as i32))
                 },
                 Instruction::F2l => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nlong(a.float() as i64))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::nlong(a.float() as i64))
                 },
                 Instruction::F2d => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::ndouble(a.float() as f64))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::ndouble(a.float() as f64))
                 },
                 Instruction::D2i => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.double() as i32))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.double() as i32))
                 },
                 Instruction::D2l => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nlong(a.double() as i64))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::nlong(a.double() as i64))
                 },
                 Instruction::D2f => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nfloat(a.double() as f32))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::nfloat(a.double() as f32))
                 },
                 Instruction::I2b => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.int() as i8 as i32))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.int() as i8 as i32))
                 },
                 Instruction::I2c => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.int() as u8 as i32))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.int() as u8 as i32))
                 },
                 Instruction::I2s => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.int() as i16 as i32))
+                    let a = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.int() as i16 as i32))
                 },
                 Instruction::Lcmp => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.long().cmp(&b.long()).into_int()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.long().cmp(&b.long()).into_int()))
                 },
                 Instruction::Fcmpl => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.float().partial_cmp(&b.float()).unwrap_or(Ordering::Less).into_int()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.float().partial_cmp(&b.float()).unwrap_or(Ordering::Less).into_int()))
                 },
                 Instruction::Fcmpg => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.float().partial_cmp(&b.float()).unwrap_or(Ordering::Greater).into_int()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.float().partial_cmp(&b.float()).unwrap_or(Ordering::Greater).into_int()))
                 },
                 Instruction::Dcmpl => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.double().partial_cmp(&b.double()).unwrap_or(Ordering::Less).into_int()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.double().partial_cmp(&b.double()).unwrap_or(Ordering::Less).into_int()))
                 },
                 Instruction::Dcmpg => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
-                    stack_frame.operand_stack.push(Value::nint(a.double().partial_cmp(&b.double()).unwrap_or(Ordering::Greater).into_int()))
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
+                    stack_frame.push(Value::nint(a.double().partial_cmp(&b.double()).unwrap_or(Ordering::Greater).into_int()))
                 },
                 Instruction::Ifeq(offset) => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
+                    let a = stack_frame.pop();
                     if a.int() == 0 {
                         pc += offset as usize;
                     }
                     continue;
                 },
                 Instruction::Ifne(offset) => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
+                    let a = stack_frame.pop();
                     if a.int() != 0 {
                         pc += offset as usize;
                     }
                     continue;
                 },
                 Instruction::Iflt(offset) => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
+                    let a = stack_frame.pop();
                     if a.int() < 0 {
                         pc += offset as usize;
                     }
                     continue;
                 },
                 Instruction::Ifge(offset) => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
+                    let a = stack_frame.pop();
                     if a.int() >= 0 {
                         pc += offset as usize;
                     }
                     continue;
                 },
                 Instruction::Ifgt(offset) => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
+                    let a = stack_frame.pop();
                     if a.int() > 0 {
                         pc += offset as usize;
                     }
                     continue;
                 },
                 Instruction::Ifle(offset) => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
+                    let a = stack_frame.pop();
                     if a.int() <= 0 {
                         pc += offset as usize;
                     }
                     continue;
                 },
                 Instruction::IfIcmpeq(offset) => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
                     if a.int() == b.int() {
                         pc += offset as usize;
                     }
                     continue;
                 },
                 Instruction::IfIcmpne(offset) => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
                     if a.int() != b.int() {
                         pc += offset as usize;
                     }
                     continue;
                 },
                 Instruction::IfIcmplt(offset) => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
                     if a.int() < b.int() {
                         pc += offset as usize;
                     }
                     continue;
                 },
                 Instruction::IfIcmpge(offset) => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
                     if a.int() >= b.int() {
                         pc += offset as usize;
                     }
                     continue;
                 },
                 Instruction::IfIcmpgt(offset) => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
                     if a.int() > b.int() {
                         pc += offset as usize;
                     }
                     continue;
                 },
                 Instruction::IfIcmple(offset) => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
                     if a.int() <= b.int() {
                         pc += offset as usize;
                     }
                     continue;
                 },
                 Instruction::IfAcmpeq(offset) => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
                     if a.int() == b.int() {
                         pc += offset as usize;
                     }
                     continue;
                 },
                 Instruction::IfAcmpne(offset) => {
-                    let a = stack_frame.operand_stack.pop().expect("no value on stack");
-                    let b = stack_frame.operand_stack.pop().expect("no value on stack");
+                    let a = stack_frame.pop();
+                    let b = stack_frame.pop();
                     if a.int() != b.int() {
                         pc += offset as usize;
                     }
@@ -582,13 +707,12 @@ impl JavaMethod {
                 Instruction::Lookupswitch => {
                     todo!()
                 },
-                Instruction::Ireturn => return stack_frame.operand_stack.pop(),
-                Instruction::Lreturn => return stack_frame.operand_stack.pop(),
-                Instruction::Freturn => return stack_frame.operand_stack.pop(),
-                Instruction::Dreturn => return stack_frame.operand_stack.pop(),
-                Instruction::Areturn => return stack_frame.operand_stack.pop(),
+                Instruction::Ireturn |
+                Instruction::Lreturn |
+                Instruction::Freturn |
+                Instruction::Dreturn |
+                Instruction::Areturn => return Some(stack_frame.pop()),
                 Instruction::Return => return None,
-
 
                 // gets a static field of a class
                 Instruction::Getstatic(n) => {
@@ -603,7 +727,7 @@ impl JavaMethod {
                     let name = get_cpi(nt.name_index).utf8().unwrap();
 
                     let val = unsafe { &*cls }.get_static(&name).unwrap();
-                    stack_frame.operand_stack.push(val);
+                    stack_frame.push(val);
                 },
                 Instruction::Putstatic(n) => {
                     let field = get_cpi(n).fieldref().unwrap();
@@ -616,13 +740,13 @@ impl JavaMethod {
 
                     let name = get_cpi(nt.name_index).utf8().unwrap();
 
-                    let val = stack_frame.operand_stack.pop().unwrap();
+                    let val = stack_frame.pop();
                     unsafe { &mut *cls }.set_static(&mut name.clone(), val);
                 },
                 Instruction::Getfield(n) => {
                     // objectref is on the stack
                     let field = get_cpi(n).fieldref().unwrap();
-                    let obj = stack_frame.operand_stack.pop().unwrap().object();
+                    let obj = stack_frame.pop().object();
                     let cls_name = get_cpi(field.class_index).class_name(constant_pool);
                     let cls = runtime.load(cls_name).unwrap();
                     unsafe {
@@ -630,13 +754,13 @@ impl JavaMethod {
                         let obj_ = obj.as_mut().unwrap();
                         let name = get_cpi(get_cpi(field.name_and_type_index)
                             .name_and_type().unwrap().name_index).utf8().unwrap();
-                        stack_frame.operand_stack.push( cls_.get_instance_field(obj_, &name) );
+                        stack_frame.push( cls_.get_instance_field(obj_, &name) );
                     }
                 },
                 Instruction::Putfield(n) => {
                     // objectref is on the stack
                     let field = get_cpi(n).fieldref().unwrap();
-                    let obj = stack_frame.operand_stack.pop().unwrap().object();
+                    let obj = stack_frame.pop().object();
                     let cls_name = get_cpi(field.class_index).class_name(constant_pool);
                     let cls = runtime.load(cls_name).unwrap();
                     unsafe {
@@ -644,7 +768,7 @@ impl JavaMethod {
                         let obj_ = obj.as_mut().unwrap();
                         let name = get_cpi(get_cpi(field.name_and_type_index)
                             .name_and_type().unwrap().name_index).utf8().unwrap();
-                        let val = stack_frame.operand_stack.pop().unwrap();
+                        let val = stack_frame.pop();
                         cls_.set_instance_field(obj_, &name, val);
                     }
                 },
@@ -670,16 +794,15 @@ impl JavaMethod {
 
                     let argc = descriptor::info(&*descriptor).args.len();
 
-                    for _ in 0..argc {
-                        new_frame
-                            .locals
-                            .push(stack_frame.operand_stack.pop().unwrap())
+                    for i in 0..argc {
+                        new_frame.set(i, stack_frame.pop())
                     }
 
                     if let Some(x) = called.exec(runtime, class.clone(), &mut new_frame) {
-                        stack_frame.operand_stack.push(x)
+                        stack_frame.push(x)
                     }
                 },
+
                 Instruction::Invokespecial(n) => {
                     let methodref = get_cpi(n).methodref().unwrap();
 
@@ -700,14 +823,12 @@ impl JavaMethod {
 
                     let argc = descriptor::info(&*descriptor).args.len();
 
-                    for _ in 0..argc {
-                        new_frame
-                            .locals
-                            .push(stack_frame.operand_stack.pop().unwrap())
+                    for i in 0..argc {
+                        new_frame.set(i, stack_frame.pop())
                     }
 
                     if let Some(x) = called.exec(runtime, class.clone(), &mut new_frame) {
-                        stack_frame.operand_stack.push(x)
+                        stack_frame.push(x)
                     }
                 },
                 Instruction::Invokestatic(n) => {
@@ -731,13 +852,11 @@ impl JavaMethod {
                     let argc = descriptor::info(&*descriptor).args.len();
 
                     for _ in 0..argc {
-                        new_frame
-                            .locals
-                            .push(stack_frame.operand_stack.pop().unwrap())
+                        new_frame.push(stack_frame.pop())
                     }
 
                     if let Some(x) = called.exec(runtime, class.clone(), &mut new_frame) {
-                        stack_frame.operand_stack.push(x)
+                        stack_frame.push(x)
                     }
                 },
                 Instruction::Invokeinterface(n) => {
@@ -760,14 +879,12 @@ impl JavaMethod {
 
                     let argc = descriptor::info(&*descriptor).args.len();
 
-                    for _ in 0..argc {
-                        new_frame
-                            .locals
-                            .push(stack_frame.operand_stack.pop().unwrap())
+                    for i in 0..argc {
+                        new_frame.set(i, stack_frame.pop())
                     }
 
                     if let Some(x) = called.exec(runtime, class.clone(), &mut new_frame) {
-                        stack_frame.operand_stack.push(x)
+                        stack_frame.push(x)
                     }
                 },
                 Instruction::Invokedynamic(n) => {
@@ -790,14 +907,12 @@ impl JavaMethod {
 
                     let argc = descriptor::info(&*descriptor).args.len();
 
-                    for _ in 0..argc {
-                        new_frame
-                            .locals
-                            .push(stack_frame.operand_stack.pop().unwrap())
+                    for i in 0..argc {
+                        new_frame.set(i, stack_frame.pop())
                     }
 
                     if let Some(x) = called.exec(runtime, class.clone(), &mut new_frame) {
-                        stack_frame.operand_stack.push(x)
+                        stack_frame.push(x)
                     }
                 },
                 Instruction::New(_n) => {
@@ -850,7 +965,7 @@ impl JavaMethod {
                     eprintln!("Previous instruction: {:?}", code.code[pc - 1]);
                     eprintln!("Next instruction: {:?}", code.code[pc + 1]);
 
-                    dbg!(&stack_frame.operand_stack);
+                    dbg!(&stack_frame);
                     // hold for user input
                     let mut input = String::new();
                     std::io::stdin().read_line(&mut input).unwrap();
@@ -862,12 +977,6 @@ impl JavaMethod {
                 Instruction::Impdep2 => {
                     panic!("IMPDEP should not appear in classfiles")
                 },
-
-
-
-
-
-
                 x => panic!("unknown bytecode {:#?}, stackframe: {:?}", x, stack_frame),
             }
             pc += 1;
@@ -876,6 +985,7 @@ impl JavaMethod {
             }
         }
     }
+    */
 }
 
 trait IntoInt {

@@ -71,10 +71,10 @@ pub fn args(descriptor: &str) -> Vec<Type> {
 }
 
 pub fn info(descriptor: &str) -> DescriptorInfo {
-    let index: usize = 0;
+    let index: usize = descriptor.find(')').unwrap();
 
     DescriptorInfo {
-        ret: type_from(&descriptor[index + 2..]),
+        ret: type_from(&descriptor[index + 1..]),
         args: args(descriptor),
     }
 }

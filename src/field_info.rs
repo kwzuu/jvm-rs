@@ -2,7 +2,7 @@ use crate::attributes::attribute_info::AttributeInfo;
 use crate::constant_pool::ConstantPoolInfo;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-use crate::things::{Object, Value};
+use crate::values::{Object, Value};
 
 
 #[derive(Debug)]

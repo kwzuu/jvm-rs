@@ -3,7 +3,7 @@ it's (a little bit of) a (slow) jvm written in rust!
 
 # running
 this requires cargo and javac to be installed
-```console
+```sh
 git clone "https://github.com/kwzuu/jvm-rs.git" && cd jvm-rs  # clone the repository and enter it
 cd test  # go into test directory
 ./build_test_classes.sh  # build test cases
